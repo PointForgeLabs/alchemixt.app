@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alchemixt — Cocktail Riff Engine</title>
+  <meta name="description" content="Generate structured cocktail riffs powered by flavor science. Built for bartenders, bar managers, and cocktail enthusiasts.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: #011640;
+      color: #F2F2F2;
+      min-height: 100vh;
+    }
+
+    /* ---- NAV ---- */
+    nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    nav .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      color: #BF8E34;
+      text-decoration: none;
+    }
+    nav .nav-links a {
+      color: rgba(242, 242, 242, 0.5);
+      text-decoration: none;
+      font-size: 0.9rem;
+      margin-left: 24px;
+      transition: color 0.2s;
+    }
+    nav .nav-links a:hover { color: #BF8E34; }
+
+    /* ---- HERO ---- */
+    .hero {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 80px 24px 60px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 3.2rem;
+      color: #F2F2F2;
+      margin-bottom: 16px;
+      line-height: 1.15;
+    }
+    .hero h1 span {
+      color: #BF8E34;
+    }
+    .hero .subtitle {
+      font-size: 1.15rem;
+      color: rgba(242, 242, 242, 0.55);
+      line-height: 1.7;
+      max-width: 540px;
+      margin: 0 auto 36px;
+    }
+    .hero .cta-row {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      display: inline-block;
+      background: #BF8E34;
+      color: #011640;
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 14px 32px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #D4A03E; }
+    .btn-secondary {
+      display: inline-block;
+      border: 1px solid rgba(191, 132, 59, 0.4);
+      color: #BF8E34;
+      font-weight: 500;
+      font-size: 1rem;
+      padding: 14px 32px;
+      border-radius: 10px;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-secondary:hover {
+      border-color: #BF8E34;
+      background: rgba(191, 132, 59, 0.08);
+    }
+
+    /* ---- FEATURES ---- */
+    .features {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+    .features h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      text-align: center;
+      color: #F2F2F2;
+      margin-bottom: 48px;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 700px) {
+      .feature-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 2.2rem; }
+    }
+    .feature-card {
+      background: #022840;
+      border: 1px solid rgba(191, 132, 59, 0.12);
+      border-radius: 14px;
+      padding: 28px 24px;
+    }
+    .feature-card .icon {
+      font-size: 1.6rem;
+      margin-bottom: 12px;
+    }
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #F2F2F2;
+      margin-bottom: 8px;
+    }
+    .feature-card p {
+      font-size: 0.9rem;
+      color: rgba(242, 242, 242, 0.5);
+      line-height: 1.6;
+    }
+
+    /* ---- TIERS ---- */
+    .tiers {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 60px 24px 80px;
+    }
+    .tiers h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      text-align: center;
+      color: #F2F2F2;
+      margin-bottom: 12px;
+    }
+    .tiers .tiers-subtitle {
+      text-align: center;
+      color: rgba(242, 242, 242, 0.45);
+      font-size: 0.95rem;
+      margin-bottom: 40px;
+    }
+    .tier-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 700px) {
+      .tier-grid { grid-template-columns: 1fr; }
+    }
+    .tier-card {
+      background: #022840;
+      border: 1px solid rgba(191, 132, 59, 0.12);
+      border-radius: 14px;
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .tier-card.featured {
+      border-color: #BF8E34;
+      position: relative;
+    }
+    .tier-card.featured::before {
+      content: 'Most Popular';
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #BF8E34;
+      color: #011640;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 4px 14px;
+      border-radius: 10px;
+    }
+    .tier-card h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.3rem;
+      color: #F2F2F2;
+      margin-bottom: 8px;
+    }
+    .tier-card .price {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #BF8E34;
+      margin-bottom: 4px;
+    }
+    .tier-card .price-note {
+      font-size: 0.8rem;
+      color: rgba(242, 242, 242, 0.35);
+      margin-bottom: 20px;
+    }
+    .tier-card ul {
+      list-style: none;
+      padding: 0;
+      text-align: left;
+    }
+    .tier-card li {
+      font-size: 0.85rem;
+      color: rgba(242, 242, 242, 0.6);
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(242, 242, 242, 0.06);
+    }
+    .tier-card li::before {
+      content: '\2713';
+      color: #BF8E34;
+      margin-right: 8px;
+      font-weight: 700;
+    }
+    .tier-card li:last-child { border-bottom: none; }
+
+    /* ---- FOOTER ---- */
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      border-top: 1px solid rgba(191, 132, 59, 0.1);
+    }
+    footer .footer-links {
+      margin-bottom: 12px;
+    }
+    footer .footer-links a {
+      color: rgba(242, 242, 242, 0.45);
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin: 0 14px;
+      transition: color 0.2s;
+    }
+    footer .footer-links a:hover { color: #BF8E34; }
+    footer .copyright {
+      font-size: 0.75rem;
+      color: rgba(242, 242, 242, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/" class="logo">Alchemixt</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="https://pointforgelabs.com/support">Support</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>Your next cocktail is a <span>riff</span> away</h1>
+    <p class="subtitle">Alchemixt generates structured cocktail variations on classic templates, powered by real flavor science. Built for bartenders, bar managers, and cocktail enthusiasts.</p>
+    <div class="cta-row">
+      <a href="#" class="btn-primary">Coming Soon on Google Play</a>
+      <a href="#pricing" class="btn-secondary">See Plans</a>
+    </div>
+  </div>
+
+  <section class="features" id="features">
+    <h2>What's in the bottle</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="icon">&#9878;</div>
+        <h3>Riff Engine</h3>
+        <p>Generate cocktail variations from classic templates. Swap spirits, modifiers, and citrus while keeping the drink balanced.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128300;</div>
+        <h3>Flavor Science</h3>
+        <p>Powered by GC-MS volatile compound data from "The Flavor Matrix." Real chemistry behind every pairing suggestion.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#127758;</div>
+        <h3>Flavor Map</h3>
+        <p>Visualize ingredient affinities across compound axes. Discover unexpected pairings backed by molecular overlap.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128516;</div>
+        <h3>Evolution Engine</h3>
+        <p>Mutate and morph saved drinks. Push a recipe in a new direction with compound-ranked ingredient swaps.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#127860;</div>
+        <h3>Food Pairings</h3>
+        <p>Match cocktails to dishes using shared volatile compounds. Impress guests with science-backed pairing suggestions.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128176;</div>
+        <h3>Cost Calculator</h3>
+        <p>Track pour costs, set menu prices at target margins, and export professional menus. Built for bar programs.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="tiers" id="pricing">
+    <h2>Choose your pour</h2>
+    <p class="tiers-subtitle">Start free. Upgrade when you're ready.</p>
+    <div class="tier-grid">
+      <div class="tier-card">
+        <h3>Free</h3>
+        <div class="price">$0</div>
+        <div class="price-note">Forever</div>
+        <ul>
+          <li>5 riffs per day</li>
+          <li>5 saved drinks</li>
+          <li>Basic flavor map</li>
+          <li>Guest menu export</li>
+        </ul>
+      </div>
+      <div class="tier-card featured">
+        <h3>Pro</h3>
+        <div class="price">$6.99</div>
+        <div class="price-note">per month &middot; or $65/year</div>
+        <ul>
+          <li>Unlimited riffs</li>
+          <li>Unlimited saves</li>
+          <li>Evolution engine</li>
+          <li>Full flavor map</li>
+          <li>Food pairings</li>
+          <li>Batch scaling</li>
+          <li>Folders &amp; tags</li>
+          <li>Guest + Training menus</li>
+        </ul>
+      </div>
+      <div class="tier-card">
+        <h3>Industry</h3>
+        <div class="price">$20</div>
+        <div class="price-note">per month &middot; or $200/year</div>
+        <ul>
+          <li>Everything in Pro</li>
+          <li>Cost calculator</li>
+          <li>Pour cost tracking</li>
+          <li>Owner menu export</li>
+          <li>Multi-user access</li>
+          <li>Inventory tools</li>
+          <li>Seasonal trends</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-links">
+      <a href="https://pointforgelabs.com/privacy">Privacy Policy</a>
+      <a href="https://pointforgelabs.com/support">Support</a>
+      <a href="https://pointforgelabs.com">Point Forge Labs</a>
+    </div>
+    <p class="copyright">&copy; 2026 Point Forge Labs. All rights reserved.</p>
+  </footer>
+</body>
+</html>
