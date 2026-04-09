@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roadmap | Alchemixt</title>
+  <meta name="description" content="What's working now, what's in flight, and where Alchemixt is going. A continuously updated view of the Alchemixt product and the work ahead." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+
+  <style>
+    /* Roadmap-specific styles */
+    .roadmap-section {
+      margin: 50px 0;
+      padding-top: 50px;
+      border-top: 1px solid var(--border-light);
+    }
+    .roadmap-section:first-of-type {
+      border-top: none;
+      padding-top: 0;
+    }
+    .roadmap-tag {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
+      margin-bottom: 14px;
+    }
+    .roadmap-section h2 {
+      font-size: 32px;
+      margin-bottom: 16px;
+    }
+    .roadmap-intro {
+      font-family: 'Fraunces', serif;
+      font-weight: 300;
+      font-size: 18px;
+      line-height: 1.55;
+      color: var(--text-on-light-soft);
+      margin-bottom: 36px;
+      max-width: 620px;
+      font-variation-settings: 'opsz' 24;
+    }
+    .roadmap-group {
+      margin-bottom: 32px;
+    }
+    .roadmap-group-title {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .roadmap-items {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .roadmap-items li {
+      padding: 10px 0;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-on-light-soft);
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .roadmap-items li::before {
+      content: '\25C6';
+      color: var(--gold);
+      font-size: 10px;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .roadmap-items li strong {
+      color: var(--text-on-light);
+      font-weight: 600;
+    }
+    .roadmap-note {
+      margin-top: 40px;
+      padding: 22px 26px;
+      background: var(--bg-light-warm);
+      border-left: 2px solid var(--gold);
+      font-family: 'Fraunces', serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--text-on-light-soft);
+      font-style: italic;
+    }
+    .update-stamp {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-on-light-muted);
+      margin-top: 60px;
+      padding-top: 30px;
+      border-top: 1px solid var(--border-light);
+      text-align: center;
+    }
+
+    @media (max-width: 720px) {
+      .roadmap-section h2 { font-size: 26px; }
+      .roadmap-intro { font-size: 16px; }
+      .roadmap-items li { font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- DARK: NAV + HERO -->
+  <div class="dark-bg">
+    <div class="container">
+      <nav>
+        <a href="/" class="brand-mark">
+          <img src="/logo.png" alt="Alchemixt" class="brand-logo" />
+          <div class="brand-block">
+            <span class="brand-text">Alchem<em>i</em>xt</span>
+            <span class="brand-tagline">Intelligence Engine</span>
+          </div>
+        </a>
+        <div class="nav-links">
+          <a href="/">Home</a>
+          <a href="/industry">Industry</a>
+          <a href="/partnerships">Partnerships</a>
+          <a href="/panel">Panel</a>
+          <a href="/roadmap" class="active">Roadmap</a>
+          <a href="/app">Web App</a>
+        </div>
+      </nav>
+
+      <header class="hero">
+        <div class="kicker">The Roadmap</div>
+        <h1 class="display">
+          What's working, what's in flight,<br />
+          and where this is <em>going.</em>
+        </h1>
+        <p class="hero-sub">
+          A continuously updated view of the Alchemixt product. No dates. No percentages. Just an honest picture of where the work actually is.
+        </p>
+      </header>
+    </div>
+  </div>
+
+  <!-- LIGHT: ROADMAP CONTENT -->
+  <div class="light-bg">
+    <div class="container">
+
+      <section>
+        <p class="body">
+          Most product roadmaps are either marketing fiction or internal spreadsheets accidentally made public. This is neither. It's a snapshot of the current state of Alchemixt, organized around what's working today, what I'm actively building, and where the product is heading next. I update it when the state changes. If you're evaluating Alchemixt for your bar or your brand, this is what I'd want you to see.
+        </p>
+
+        <div class="divider">
+          <span></span>
+          <div class="mark"></div>
+          <span></span>
+        </div>
+      </section>
+
+      <section class="roadmap-section">
+        <div class="roadmap-tag">Shipped and Stable</div>
+        <h2>What's working <em>now.</em></h2>
+        <p class="roadmap-intro">
+          The Alchemixt you'd use today is a working product with a real flavor engine, a real ingredient database, and a working bar team loop. Here's what's already in your hands.
+        </p>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">The Flavor Engine</div>
+          <ul class="roadmap-items">
+            <li><strong>The aromatic intelligence engine.</strong> About 1,400 ingredients scored across aromatic and taste axes, built by hand over two years. Every recommendation, substitution, and riff the system generates comes from this data.</li>
+            <li><strong>Cocktail Codex root family classification.</strong> Every drink in the system is grounded in its structural lineage, with the six root families as the backbone.</li>
+            <li><strong>Why It Works engine.</strong> Explains the logic behind every suggested pairing or substitution in plain language, so bartenders can learn the reasoning and apply it themselves.</li>
+            <li><strong>Flavor lineage trees.</strong> Visualizes how classic drinks relate to each other and to modern riffs, turning cocktail history into something you can navigate.</li>
+            <li><strong>Food pairing suggestions.</strong> Because cocktails don't exist in isolation, the engine knows how to pair drinks with what's coming out of the kitchen.</li>
+            <li><strong>Taste balance prediction.</strong> Tells you whether a proposed spec is going to land sweet, sour, bitter, or balanced before you make it.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">Menu Development and Creation</div>
+          <ul class="roadmap-items">
+            <li><strong>Menu Generator.</strong> Full seasonal menus in minutes, tailored to your spirit inventory, your house style, and the kind of guest walking in your door.</li>
+            <li><strong>Mutation Mode.</strong> Ten directions and three intensities, so you can take any classic and explore it at the level of precision that fits your program.</li>
+            <li><strong>Tiki Riff Engine.</strong> Dedicated logic for tropical and tiki development, respecting the structural rules of the category without being bound by them.</li>
+            <li><strong>Spec Morphing Sliders.</strong> Adjust the shape of a cocktail in real time and watch the engine recalculate.</li>
+            <li><strong>Custom Spec Builder.</strong> Build a drink from scratch with the engine assisting at every step.</li>
+            <li><strong>Adventurous Mode.</strong> Turn up the creative weight when you want the engine to push beyond familiar territory.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">The Bar Team</div>
+          <ul class="roadmap-items">
+            <li><strong>My Bar inventory.</strong> Your actual spirits, syrups, and modifiers, on the device, shaping every suggestion the engine makes.</li>
+            <li><strong>Barcode scanning.</strong> Point the camera, scan the bottle, add it to your bar. Works with Open Food Facts and UPC databases, with a spirit keyword fallback for everything else.</li>
+            <li><strong>Ratio Lab.</strong> For teaching palate, not just teaching recipes. Bartenders adjust ratios and see the balance shift in real time.</li>
+            <li><strong>Bar Teams.</strong> Shared specs, shared inventory, shared training across every bartender on the team.</li>
+            <li><strong>Share codes and image sharing.</strong> Send a drink spec as a link or as a shareable image, on mobile or on the web.</li>
+            <li><strong>Batch scaling and pour cost calculators.</strong> The math that matters for serious programs, built into the tool.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">The Community</div>
+          <ul class="roadmap-items">
+            <li><strong>Check-in system.</strong> "I Made This" logging for drinks you've tried, shifts you've worked, and ingredients you've encountered. A working, private log of your craft.</li>
+            <li><strong>Creator profiles and tiers.</strong> A badge system that recognizes the bartenders doing the most interesting work on the platform, with a clear path from newcomer to veteran.</li>
+            <li><strong>Community feed.</strong> What the rest of the community is building, with All and Following tabs, so you can follow specific bartenders whose taste you trust.</li>
+            <li><strong>Trending.</strong> What's moving across the platform, filtered by time range, templates, and ingredients, with a leaderboard for the top creators and drill-ins on specific ingredients.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">For the Industry Tier</div>
+          <ul class="roadmap-items">
+            <li><strong>Menu PDF export.</strong> Print-ready menus with layout, pricing, and the option to include a tip QR code for service.</li>
+            <li><strong>Bar team collaboration.</strong> Every bartender at the location, one annual price, no per-seat fees.</li>
+            <li><strong>Web and mobile.</strong> Everything is accessible from the app and the web dashboard, so you can develop on a laptop and serve from behind the bar.</li>
+            <li><strong>Annual licensing.</strong> Industry is sold direct, billed annually, with no monthly churn traps and no App Store gatekeeping.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="roadmap-section">
+        <div class="roadmap-tag">In Flight</div>
+        <h2>What I'm actively <em>building.</em></h2>
+        <p class="roadmap-intro">
+          These are the pieces I'm working on right now. I'm not committing to dates because I've watched too many founders break promises by doing that, but these are the things I'm focused on in the near term.
+        </p>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">Product Refinement</div>
+          <ul class="roadmap-items">
+            <li><strong>Recipe detail enhancements.</strong> Richer information on every drink page, including root family badges, ingredient role labels, and context about the cocktail's lineage.</li>
+            <li><strong>Browse by family.</strong> A new navigation mode that lets you explore the entire Alchemixt library through the lens of the six cocktail root families.</li>
+            <li><strong>Automatic classification.</strong> Bringing every recipe in the database into the root family system, so the structural logic applies consistently across the whole library.</li>
+            <li><strong>Family crossing warnings.</strong> When a proposed substitution or riff crosses structural family boundaries, the engine should flag it so bartenders make informed choices.</li>
+            <li><strong>Fork and remix lineage.</strong> When you build on someone else's spec, the system should track the lineage publicly so credit flows where it's due.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">Industry Tier Depth</div>
+          <ul class="roadmap-items">
+            <li><strong>Tags and organization.</strong> For bar managers who need to categorize specs by season, style, program, or any other axis they care about.</li>
+            <li><strong>Folders and projects.</strong> So multi-location groups and consulting engagements can keep their work organized and separable.</li>
+            <li><strong>Notes and annotations.</strong> The marginalia layer for bar teams who treat their recipe library as a living document.</li>
+            <li><strong>CSV export.</strong> For when the POS integration needs it and you don't want to retype everything.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">Launch Readiness</div>
+          <ul class="roadmap-items">
+            <li><strong>App Store and Play Store listings.</strong> Screenshots, copy, and the full submission packages for iOS and Android.</li>
+            <li><strong>Free trial system.</strong> For the consumer tier, a first-use window that lets bartenders actually try the product before committing to a subscription.</li>
+            <li><strong>Community barcode loop.</strong> The verification and feedback system that lets the bottle database grow from every scan across the platform.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="roadmap-section">
+        <div class="roadmap-tag">Horizon</div>
+        <h2>What's <em>coming</em> after that.</h2>
+        <p class="roadmap-intro">
+          The bigger directions I'm building toward. These are less certain than the work in flight, but they're the horizon I'm navigating toward, and they shape how I'm thinking about the product today.
+        </p>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">Private Deployments</div>
+          <ul class="roadmap-items">
+            <li><strong>White-label Alchemixt for spirits brands.</strong> A dedicated deployment configured to a brand's portfolio, for ambassador teams and field reps.</li>
+            <li><strong>Multi-location dashboards for hospitality groups.</strong> Central visibility across every bar in a portfolio, with the configuration and reporting hotel F&amp;B directors actually need.</li>
+            <li><strong>Curriculum integration for schools.</strong> A teaching tool that shows bartending students the flavor logic behind the drinks, not just the specs.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">The Flavor Engine, Deeper</div>
+          <ul class="roadmap-items">
+            <li><strong>More ingredients, more depth.</strong> The 1,400-ingredient database is a foundation, not a ceiling. I'm continuously adding obscure, regional, and specialty ingredients as I learn about them.</li>
+            <li><strong>Better substitution intelligence.</strong> The current substitution logic is good. The next version should be excellent, with more structural reasoning and better contextual awareness.</li>
+            <li><strong>Seasonal and regional weighting.</strong> Because a Negroni in July is not the same drink as a Negroni in December, and the engine should know the difference.</li>
+          </ul>
+        </div>
+
+        <div class="roadmap-group">
+          <div class="roadmap-group-title">The Community, Formalized</div>
+          <ul class="roadmap-items">
+            <li><strong>The Alchemixt Tasting Panel.</strong> A small, deliberately curated group of bartenders helping shape the product from the inside. Inaugural members to be announced.</li>
+            <li><strong>Deeper creator tools.</strong> For the bartenders doing the most interesting work on the platform, better ways to share, teach, and be credited.</li>
+            <li><strong>Educational content.</strong> Written and structured learning paths that help new bartenders go from spec-followers to palate-builders.</li>
+          </ul>
+        </div>
+      </section>
+
+      <div class="roadmap-note">
+        This page is deliberately imperfect. If something shown here as "shipped" breaks, it goes back to "in flight" until it's fixed. If something I'm actively building turns out to be the wrong thing, it gets dropped and I'll say so. I'd rather the roadmap be honest and occasionally ugly than polished and misleading.
+      </div>
+
+      <div class="update-stamp">
+        Last updated April 2026
+      </div>
+
+    </div>
+  </div>
+
+  <!-- DARK: CTA + FOOTER -->
+  <div class="dark-bg">
+    <div class="container">
+      <section class="cta">
+        <div class="kicker">Questions or Feedback</div>
+        <h2>See something missing, wrong, or worth building?</h2>
+        <a href="mailto:hello@alchemixt.app?subject=Roadmap%20Feedback" class="cta-button">Tell Me</a>
+        <div class="cta-email">
+          <a href="mailto:hello@alchemixt.app">hello@alchemixt.app</a>
+        </div>
+      </section>
+
+      <footer>
+        <a href="/" class="brand-mark">
+          <img src="/logo.png" alt="Alchemixt" class="brand-logo" style="width:24px;height:24px;" />
+          <span class="brand-text" style="font-size:15px;">Alchem<em>i</em>xt</span>
+        </a>
+        <div class="colophon">
+          A product of Point Forge Labs<br />
+          New Orleans, Louisiana
+        </div>
+      </footer>
+    </div>
+  </div>
+
+</body>
+</html>
