@@ -65,20 +65,23 @@
       margin: 0;
     }
     .roadmap-items li {
-      padding: 10px 0;
+      padding: 12px 0 12px 24px;
       font-size: 15px;
-      line-height: 1.6;
+      line-height: 1.7;
       color: var(--text-on-light-soft);
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
+      position: relative;
+      border-bottom: 1px solid rgba(216, 207, 184, 0.4);
+    }
+    .roadmap-items li:last-child {
+      border-bottom: none;
     }
     .roadmap-items li::before {
       content: '\25C6';
       color: var(--gold);
-      font-size: 10px;
-      margin-top: 6px;
-      flex-shrink: 0;
+      font-size: 8px;
+      position: absolute;
+      left: 0;
+      top: 18px;
     }
     .roadmap-items li strong {
       color: var(--text-on-light);
