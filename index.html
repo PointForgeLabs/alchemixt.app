@@ -1,37 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://lh3.googleusercontent.com; connect-src 'self' https://*.supabase.co https://api.revenuecat.com https://api.anthropic.com https://checkout.stripe.com; frame-src https://checkout.stripe.com;">
-    <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>Alchemixt</title>
-    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
-    <style id="expo-reset">
-      /* These styles make the body full-height */
-      html,
-      body {
-        height: 100%;
-      }
-      /* These styles disable body scrolling if you are using <ScrollView> */
-      body {
-        overflow: hidden;
-      }
-      /* These styles make the root element full-height */
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
-    </style>
-  <link rel="icon" href="/favicon.ico" /></head>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alchemixt | Cocktail intelligence, built in New Orleans</title>
+  <meta name="description" content="Alchemixt is a cocktail tool built in New Orleans. A working app for bartenders, a menu development platform for bars, and a private deployment offering for spirits brands and hotel groups." />
 
-  <body>
-    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <!-- The root element for your Expo app. -->
-    <div id="root"></div>
-  <script src="/_expo/static/js/web/entry-0b6c22d6b74e8b2ed600b85d2c22bb0d.js" defer></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+  <div class="container">
+    <nav>
+      <a href="/" class="brand">Alchem<em>i</em>xt</a>
+      <div class="nav-links">
+        <a href="/" class="active">Home</a>
+        <a href="/industry">Industry</a>
+        <a href="/partnerships">Partnerships</a>
+        <a href="/app">Web App</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <div class="kicker">Cocktail Intelligence</div>
+      <h1 class="display">
+        Built in New Orleans, for people who<br />
+        take the <em>craft</em> seriously.
+      </h1>
+      <p class="hero-sub">
+        A working tool for bartenders. A menu development platform for bars. A private deployment offering for the spirits brands and hospitality groups building what comes next.
+      </p>
+    </header>
+
+    <section>
+      <p class="body">
+        Alchemixt is a cocktail tool I built in New Orleans over the last two years. At its core is a flavor engine that scores about 1,400 ingredients across compound and taste profiles, and uses that data to generate riffs, full menus, substitution logic, and training references that a bar team can actually work from.
+      </p>
+      <p class="body">
+        I built it because the tool I wanted didn't exist, and because I got tired of watching good bar programs pay consultants for work that should have compounded instead of evaporating after every quarterly refresh. What started as a personal project is now three things: a consumer app for bartenders and enthusiasts, a professional platform for bars and restaurant groups, and a private deployment offering for the companies that sit above the bar in the cocktail industry.
+      </p>
+
+      <div class="divider">
+        <span></span>
+        <div class="mark"></div>
+        <span></span>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">Three Doors</div>
+      <h2>Pick the one that fits <em>your</em> world.</h2>
+
+      <div class="doors">
+        <a href="/app" class="door">
+          <div>
+            <div class="door-tag">For Bartenders &amp; Enthusiasts</div>
+            <h3>The <em>App</em></h3>
+            <p>A working cocktail tool for your phone. Riff on classics, generate specs from ingredients you actually have, and learn the flavor logic behind the drinks you love. Free to start. Pro subscription for power users.</p>
+          </div>
+          <div class="door-arrow">&#8594;</div>
+        </a>
+
+        <a href="/industry" class="door">
+          <div>
+            <div class="door-tag">For Bars &amp; Restaurant Groups</div>
+            <h3>Alchemixt <em>Industry</em></h3>
+            <p>A professional menu development and staff training platform, licensed annually. Unlimited bartenders per location, one flat price, no per-seat fees. Replaces most of what a cocktail consultant does, without the part where they leave.</p>
+          </div>
+          <div class="door-arrow">&#8594;</div>
+        </a>
+
+        <a href="/partnerships" class="door">
+          <div>
+            <div class="door-tag">For Spirits Brands &amp; Hospitality Groups</div>
+            <h3><em>Partnerships</em></h3>
+            <p>Private, branded deployments of Alchemixt for spirits brands, hotel operators, and education partners. Co-designed with our first enterprise partners, configured to your portfolio, your properties, or your curriculum.</p>
+          </div>
+          <div class="door-arrow">&#8594;</div>
+        </a>
+      </div>
+    </section>
+
+    <section class="stage">
+      <div class="section-label">Who Built This</div>
+      <h2>One founder. Two years. <em>No shortcuts.</em></h2>
+      <p class="body">
+        I'm Jason, the founder. Alchemixt is built in New Orleans and it is bootstrapped. I spent a decade in institutional finance before this, and several years bartending private events in the New Orleans hospitality scene. I built Alchemixt because the tool I wanted didn't exist, and because I was tired of watching good bar programs pay consultants for work that should have compounded instead of evaporating after every quarterly refresh.
+      </p>
+      <p class="body">
+        The version of this project that took venture money, scaled fast, and chased consumer downloads would look completely different. It would probably also be worse. I'm taking a slower path because the craft this product serves is one I care about, and because I'd rather build something that compounds than something that trends. If that sounds like the kind of company you want to work with, any of the three doors above will take you somewhere useful.
+      </p>
+    </section>
+
+    <section class="cta">
+      <div class="kicker">Get in Touch</div>
+      <h2>Questions, pilots, or partnerships?</h2>
+      <a href="mailto:hello@alchemixt.app?subject=Hello" class="cta-button">Write to Jason</a>
+      <div class="cta-email">
+        <a href="mailto:hello@alchemixt.app">hello@alchemixt.app</a>
+      </div>
+    </section>
+
+    <footer>
+      <a href="/" class="brand">Alchem<em>i</em>xt</a>
+      <div class="colophon">
+        A product of Point Forge Labs<br />
+        New Orleans, Louisiana
+      </div>
+    </footer>
+  </div>
+
 </body>
 </html>
