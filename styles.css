@@ -705,4 +705,60 @@ footer .colophon {
 .hero h1.display { animation: fadeUp 0.9s ease-out 0.25s both; }
 .hero .hero-sub { animation: fadeUp 0.9s ease-out 0.45s both; }
 
+/* -- HERO FIGURE -- */
+.hero-figure {
+  margin: 60px auto 0;
+  max-width: 1040px;
+  padding: 0;
+  animation: fadeUp 1s ease-out 0.6s both;
+}
+.hero-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-dark);
+  background: var(--bg-dark-elev);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+.hero-figure figcaption {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-on-dark-muted);
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* -- FIGURE COMPONENT -- */
+figure.alchemixt-figure {
+  margin: 50px 0;
+  padding: 0;
+}
+figure.alchemixt-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--border-light);
+  background: var(--bg-light-warm);
+}
+.dark-bg figure.alchemixt-figure img {
+  border-color: var(--border-dark);
+  background: var(--bg-dark-elev);
+}
+figure.alchemixt-figure figcaption {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-on-light-muted);
+  text-align: center;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .hero-figure { margin-top: 40px; }
+  figure.alchemixt-figure { margin: 30px 0; }
+}
+
 ::selection { background: var(--gold); color: var(--bg-dark); }
