@@ -708,7 +708,7 @@ footer .colophon {
 /* -- HERO FIGURE -- */
 .hero-figure {
   margin: 60px auto 0;
-  max-width: 1040px;
+  max-width: 860px;
   padding: 0;
   animation: fadeUp 1s ease-out 0.6s both;
 }

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <pattern id="dots" x="0" y="0" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="14" cy="14" r="0.8" fill="rgba(212,165,74,0.08)"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#0A0F1F"/>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+
+  <!-- Gold accent line -->
+  <rect x="570" y="220" width="60" height="2" fill="#D4A54A"/>
+
+  <!-- Wordmark -->
+  <text x="600" y="290" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="52" font-weight="700" fill="#D4A54A" letter-spacing="1">
+    Alchemixt
+  </text>
+
+  <!-- Tagline -->
+  <text x="600" y="326" text-anchor="middle" font-family="-apple-system, 'Segoe UI', sans-serif" font-size="13" font-weight="600" letter-spacing="4" fill="rgba(242,236,222,0.45)">
+    FLAVOR, STRUCTURED
+  </text>
+
+  <!-- Diamond divider -->
+  <line x1="530" y1="370" x2="580" y2="370" stroke="rgba(212,165,74,0.3)" stroke-width="1"/>
+  <rect x="597" y="367" width="6" height="6" fill="#D4A54A" transform="rotate(45 600 370)"/>
+  <line x1="620" y1="370" x2="670" y2="370" stroke="rgba(212,165,74,0.3)" stroke-width="1"/>
+
+  <!-- Subtitle -->
+  <text x="600" y="415" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="18" fill="rgba(242,236,222,0.5)">
+    Cocktail intelligence, built in New Orleans
+  </text>
+</svg>
