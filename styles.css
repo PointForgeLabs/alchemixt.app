@@ -580,8 +580,10 @@ p.body strong {
 }
 
 /* -- STAGE / BIO -- */
-.stage { padding: 70px 0 30px; }
-.stage p.body { max-width: 680px; }
+.stage { padding: 70px 0 30px; text-align: center; }
+.stage .section-label { justify-content: center; }
+.stage .section-label::before { display: none; }
+.stage p.body { max-width: 680px; margin-left: auto; margin-right: auto; text-align: left; }
 
 /* -- CTA -- */
 .cta {
