@@ -670,7 +670,7 @@ footer .colophon {
   .container { padding: 0 24px; }
   nav { padding: 22px 0; }
   .brand-tagline { display: none; }
-  .nav-links { gap: 18px; font-size: 10px; }
+  .nav-links { display: none; }
   .hero { padding: 70px 0 90px; }
   h1.display { font-size: 38px; }
   .hero-sub { font-size: 17px; }
