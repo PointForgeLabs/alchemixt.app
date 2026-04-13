@@ -709,6 +709,8 @@ footer .colophon {
     letter-spacing: 0.1em;
   }
   .nav-links a:last-child { border-bottom: none; }
+  .nav-links a[href="/app"] { display: none; }
+  a.door[href="/app"] { display: none; }
   .hero { padding: 70px 0 90px; }
   h1.display { font-size: 38px; }
   .hero-sub { font-size: 17px; }
