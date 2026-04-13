@@ -34,7 +34,8 @@
             <span class="brand-tagline">Flavor, Structured</span>
           </div>
         </a>
-        <div class="nav-links">
+        <button class="nav-hamburger" aria-label="Open menu" onclick="this.classList.toggle('open'); document.getElementById('nav-links').classList.toggle('open');"><span></span><span></span><span></span></button>
+        <div class="nav-links" id="nav-links">
           <a href="/">Home</a>
           <a href="/industry">Industry</a>
           <a href="/partnerships" class="active">Partnerships</a>
