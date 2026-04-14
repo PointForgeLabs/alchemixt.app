@@ -113,10 +113,10 @@
           <div class="hero-cta" id="cta-live" style="display:none;">
             <div class="store-badges">
               <a href="#" id="badge-ios" class="store-badge" onclick="trackEvent('app_store_click')">
-                <img src="/images/home/app-store-badge.svg" alt="Download on the App Store" />
+                <img data-src="/images/home/app-store-badge.svg" alt="Download on the App Store" />
               </a>
               <a href="#" id="badge-android" class="store-badge" onclick="trackEvent('play_store_click')">
-                <img src="/images/home/google-play-badge.svg" alt="Get it on Google Play" />
+                <img data-src="/images/home/google-play-badge.svg" alt="Get it on Google Play" />
               </a>
             </div>
             <p class="hero-cta-note">Or <a href="/app" onclick="trackEvent('web_app_click')">try the web app</a></p>
@@ -126,11 +126,13 @@
         </div>
 
         <div class="hero-visual">
-          <!-- Video scaffolding: swap src when asset is ready -->
-          <video class="hero-video" autoplay muted loop playsinline poster="/images/home/home-hero-flavormap.png" style="display:none;">
+          <!-- Video scaffolding: add src attributes when video asset is ready -->
+          <!--
+          <video class="hero-video" autoplay muted loop playsinline poster="/images/home/home-hero-flavormap.png">
             <source src="/images/home/hero-demo.webm" type="video/webm" />
             <source src="/images/home/hero-demo.mp4" type="video/mp4" />
           </video>
+          -->
           <img
             class="hero-poster"
             src="/images/home/home-hero-flavormap.png"
@@ -214,10 +216,10 @@
             <div class="audience-cta" id="audience-cta-live" style="display:none;">
               <div class="store-badges">
                 <a href="#" class="store-badge" onclick="trackEvent('app_store_click')">
-                  <img src="/images/home/app-store-badge.svg" alt="Download on the App Store" />
+                  <img data-src="/images/home/app-store-badge.svg" alt="Download on the App Store" />
                 </a>
                 <a href="#" class="store-badge" onclick="trackEvent('play_store_click')">
-                  <img src="/images/home/google-play-badge.svg" alt="Get it on Google Play" />
+                  <img data-src="/images/home/google-play-badge.svg" alt="Get it on Google Play" />
                 </a>
               </div>
             </div>
@@ -319,8 +321,11 @@
         document.getElementById('audience-cta-live').style.display = '';
         document.querySelectorAll('.store-badge').forEach(function(el) {
           var img = el.querySelector('img');
-          if (img && img.alt.indexOf('App Store') !== -1) el.href = APP_STORE_URL;
-          if (img && img.alt.indexOf('Google Play') !== -1) el.href = PLAY_STORE_URL;
+          if (img) {
+            if (img.dataset.src) img.src = img.dataset.src;
+            if (img.alt.indexOf('App Store') !== -1) el.href = APP_STORE_URL;
+            if (img.alt.indexOf('Google Play') !== -1) el.href = PLAY_STORE_URL;
+          }
         });
       }
     })();
