@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Alchemixt | Built in New Orleans</title>
-  <meta name="description" content="Alchemixt is a cocktail tool built in New Orleans. A working app for bartenders, a menu development platform for bars, and a private deployment offering for spirits brands and hotel groups." />
+  <title>Alchemixt | A flavor engine for bartenders</title>
+  <meta name="description" content="A working cocktail tool with a flavor engine that scores 1,400 ingredients, generates riffs and menus, and shows you why pairings work. Built in New Orleans." />
+  <link rel="canonical" href="https://alchemixt.app/" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -12,19 +13,59 @@
   <link rel="icon" type="image/png" href="/favicon.png?v=2" />
   <link rel="stylesheet" href="/styles.css" />
 
-  <meta property="og:title" content="Alchemixt | Flavor, Structured" />
-  <meta property="og:description" content="A cocktail tool built in New Orleans. 1,400 ingredients scored across aromatic and taste profiles." />
+  <meta property="og:title" content="Alchemixt | A flavor engine for bartenders" />
+  <meta property="og:description" content="A working cocktail tool with a flavor engine that scores 1,400 ingredients, generates riffs and menus, and shows you why pairings work. Built in New Orleans." />
   <meta property="og:image" content="https://alchemixt.app/images/shared/og-image.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="https://alchemixt.app/" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Alchemixt" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Alchemixt | A flavor engine for bartenders" />
+  <meta name="twitter:description" content="A working cocktail tool with a flavor engine that scores 1,400 ingredients, generates riffs and menus, and shows you why pairings work. Built in New Orleans." />
   <meta name="twitter:image" content="https://alchemixt.app/images/shared/og-image.jpg" />
+
+  <!-- Google Analytics 4 (replace GA_MEASUREMENT_ID when ready) -->
+  <!--
+  <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'GA_MEASUREMENT_ID');
+  </script>
+  -->
+
+  <!-- Meta Pixel (replace META_PIXEL_ID when ready) -->
+  <!--
+  <script>
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+    n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+    document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', 'META_PIXEL_ID');
+    fbq('track', 'PageView');
+  </script>
+  -->
 </head>
 <body>
 
-  <!-- DARK: NAV + HERO -->
+  <!-- ====== LAUNCH STATE CONFIG ====== -->
+  <script>
+    var LAUNCH_STATE = 'pre'; // 'pre' or 'live'
+    var APP_STORE_URL = '#';
+    var PLAY_STORE_URL = '#';
+
+    // Analytics helper (fires GA4 + Meta Pixel when configured)
+    function trackEvent(name, params) {
+      if (typeof gtag === 'function') gtag('event', name, params || {});
+      if (typeof fbq === 'function') fbq('trackCustom', name, params || {});
+    }
+  </script>
+
+  <!-- ====== DARK: NAV + HERO ====== -->
   <div class="dark-bg">
     <div class="container">
       <nav>
@@ -40,104 +81,204 @@
         </button>
         <div class="nav-links" id="nav-links">
           <a href="/" class="active">Home</a>
-          <a href="/industry">Industry</a>
-          <a href="/partnerships">Partnerships</a>
+          <a href="/industry">For Bars</a>
+          <a href="/partnerships">For Brands</a>
           <a href="/roadmap">Roadmap</a>
           <a href="/app">Web App</a>
+          <a href="#download" class="nav-download" onclick="trackEvent('nav_download_click')">Download</a>
         </div>
       </nav>
 
-      <header class="hero">
-        <div class="kicker">Cocktail Intelligence</div>
-        <h1 class="display">
-          Built in New Orleans, for people who<br />
-          take the <em>craft</em> seriously.
-        </h1>
-        <p class="hero-sub">
-          A working tool for bartenders. A menu development platform for bars. A private deployment offering for the spirits brands and hospitality groups building what comes next.
-        </p>
-      </header>
+      <header class="hero hero-split" id="download">
+        <div class="hero-copy">
+          <div class="kicker">Cocktail Intelligence</div>
+          <h1 class="display">
+            The cocktail tool I wished <em>existed.</em>
+          </h1>
+          <p class="hero-sub">
+            A flavor engine that scores 1,400 ingredients across taste and aroma, generates riffs and full menus, and shows you why pairings work. Built for working bartenders.
+          </p>
 
-      <figure class="hero-figure">
-        <img
-          src="/images/home/home-hero-flavormap.png"
-          alt="The Alchemixt Evolve engine showing the Flavor Map visualization with cocktail scatter plot, compound analysis, and drink detail for a Jungle Bird"
-          width="2494"
-          height="1436"
-          loading="eager"
-        />
-      </figure>
+          <!-- Pre-launch CTA -->
+          <div class="hero-cta" id="cta-pre">
+            <form class="email-capture" id="email-form" onsubmit="return handleEmailSubmit(event)">
+              <label for="email-input" class="sr-only">Email address</label>
+              <input type="email" id="email-input" name="email" placeholder="you@example.com" required autocomplete="email" />
+              <button type="submit">Notify me at launch</button>
+            </form>
+            <p class="hero-cta-note">Launching on iOS and Android. Get notified the day it goes live.</p>
+          </div>
+
+          <!-- Post-launch CTA (hidden until LAUNCH_STATE = 'live') -->
+          <div class="hero-cta" id="cta-live" style="display:none;">
+            <div class="store-badges">
+              <a href="#" id="badge-ios" class="store-badge" onclick="trackEvent('app_store_click')">
+                <img src="/images/home/app-store-badge.svg" alt="Download on the App Store" />
+              </a>
+              <a href="#" id="badge-android" class="store-badge" onclick="trackEvent('play_store_click')">
+                <img src="/images/home/google-play-badge.svg" alt="Get it on Google Play" />
+              </a>
+            </div>
+            <p class="hero-cta-note">Or <a href="/app" onclick="trackEvent('web_app_click')">try the web app</a></p>
+          </div>
+
+          <a href="#features" class="hero-secondary">See how it works &#8595;</a>
+        </div>
+
+        <div class="hero-visual">
+          <!-- Video scaffolding: swap src when asset is ready -->
+          <video class="hero-video" autoplay muted loop playsinline poster="/images/home/home-hero-flavormap.png" style="display:none;">
+            <source src="/images/home/hero-demo.webm" type="video/webm" />
+            <source src="/images/home/hero-demo.mp4" type="video/mp4" />
+          </video>
+          <img
+            class="hero-poster"
+            src="/images/home/home-hero-flavormap.png"
+            alt="The Alchemixt Evolve engine showing the Flavor Map visualization with cocktail scatter plot, compound analysis, and drink detail"
+            width="2494"
+            height="1436"
+            loading="eager"
+          />
+        </div>
+      </header>
     </div>
   </div>
 
-  <!-- LIGHT: INTRO + DOORS -->
+  <!-- ====== DARK: WHAT IT DOES ====== -->
+  <div class="dark-bg" id="features">
+    <div class="container">
+      <section>
+        <div class="section-label">What It Does</div>
+        <h2>What Alchemixt actually <em>does.</em></h2>
+
+        <div class="feature-row">
+          <div class="feature-row-img">
+            <!-- PLACEHOLDER: replace with Evolve riff results screenshot -->
+            <div class="img-placeholder">Evolve screenshot</div>
+          </div>
+          <div class="feature-row-copy">
+            <h3>Evolve any <em>classic.</em></h3>
+            <p>Start with a Negroni, a Daiquiri, anything. Get ten riffs that actually make sense, generated from the compounds in your bottles. Lock the spirits you have. Swap the modifiers you don't.</p>
+          </div>
+        </div>
+
+        <div class="feature-row feature-row-reverse">
+          <div class="feature-row-img">
+            <!-- PLACEHOLDER: replace with Flavor Map visualization screenshot -->
+            <div class="img-placeholder">Flavor Map screenshot</div>
+          </div>
+          <div class="feature-row-copy">
+            <h3>See why pairings <em>work.</em></h3>
+            <p>1,400 ingredients plotted across aromatic and taste profiles. Find the ingredient that bridges two flavors. Understand the structure of the drinks you already love.</p>
+          </div>
+        </div>
+
+        <div class="feature-row">
+          <div class="feature-row-img">
+            <!-- PLACEHOLDER: replace with Menu Generator output screenshot -->
+            <div class="img-placeholder">Menu Generator screenshot</div>
+          </div>
+          <div class="feature-row-copy">
+            <h3>Build a full menu from your <em>back bar.</em></h3>
+            <p>Tell Alchemixt what you have and what you want the menu to feel like. Get a balanced, diverse spec sheet ready to cost out and serve.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ====== LIGHT: WHO IT'S FOR ====== -->
   <div class="light-bg">
     <div class="container">
-
       <section>
-        <p class="body">
-          Alchemixt is a cocktail tool I built in New Orleans over the last two years. At its core is a flavor engine that scores about 1,400 ingredients across aromatic and taste profiles, and uses that data to generate riffs, full menus, substitution logic, and training references that a bar team can actually work from.
-        </p>
-        <p class="body">
-          I built it because the tool I wanted didn't exist, and because I got tired of watching good bar programs pay consultants for work that should have compounded instead of evaporating after every quarterly refresh. What started as a personal project is now three things: a working app for bartenders, a professional platform for bars and restaurant groups, and a private deployment offering for the companies that sit above the bar in the cocktail industry.
-        </p>
+        <div class="section-label">Who It's For</div>
+        <h2>Pick the door that fits <em>your</em> world.</h2>
 
-        <div class="divider">
-          <span></span>
-          <div class="mark"></div>
-          <span></span>
-        </div>
-      </section>
+        <div class="audience-grid">
+          <!-- App card (primary, large) -->
+          <div class="audience-card audience-card-primary">
+            <div class="door-tag">For Bartenders &amp; Enthusiasts</div>
+            <h3>The <em>App.</em></h3>
+            <p>A working cocktail tool for your phone. Riff on classics, generate specs from ingredients you actually have, and learn the flavor logic behind the drinks you love. Free to start. Pro for power users.</p>
 
-      <section>
-        <div class="section-label">Three Doors</div>
-        <h2>Pick the one that fits <em>your</em> world.</h2>
-
-        <div class="doors">
-          <a href="/app" class="door">
-            <div>
-              <div class="door-tag">For Bartenders &amp; Enthusiasts</div>
-              <h3>The <em>App</em></h3>
-              <p>A working cocktail tool for your phone. Riff on classics, generate specs from ingredients you actually have, and learn the flavor logic behind the drinks you love. Free to start. Pro subscription for power users.</p>
+            <!-- Pre-launch CTA (mirrors hero) -->
+            <div class="audience-cta" id="audience-cta-pre">
+              <form class="email-capture email-capture-light" onsubmit="return handleEmailSubmit(event)">
+                <label for="email-input-2" class="sr-only">Email address</label>
+                <input type="email" id="email-input-2" name="email" placeholder="you@example.com" required autocomplete="email" />
+                <button type="submit">Notify me</button>
+              </form>
             </div>
-            <div class="door-arrow">&#8594;</div>
-          </a>
 
-          <a href="/industry" class="door">
-            <div>
+            <!-- Post-launch CTA -->
+            <div class="audience-cta" id="audience-cta-live" style="display:none;">
+              <div class="store-badges">
+                <a href="#" class="store-badge" onclick="trackEvent('app_store_click')">
+                  <img src="/images/home/app-store-badge.svg" alt="Download on the App Store" />
+                </a>
+                <a href="#" class="store-badge" onclick="trackEvent('play_store_click')">
+                  <img src="/images/home/google-play-badge.svg" alt="Get it on Google Play" />
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- B2B cards (secondary, stacked) -->
+          <div class="audience-b2b-stack">
+            <a href="/industry" class="audience-card audience-card-secondary" onclick="trackEvent('industry_card_click')">
               <div class="door-tag">For Bars &amp; Restaurant Groups</div>
-              <h3>Alchemixt <em>Industry</em></h3>
-              <p>A professional menu development and staff training platform, licensed annually. Unlimited bartenders per location, one flat price, no per-seat fees. Replaces most of what a cocktail consultant does, without the part where they leave.</p>
-            </div>
-            <div class="door-arrow">&#8594;</div>
-          </a>
+              <h3>Alchemixt <em>Industry.</em></h3>
+              <p>Menu development and staff training, licensed annually. Unlimited bartenders per location, one flat price.</p>
+              <span class="audience-link">Learn about Industry &#8594;</span>
+            </a>
 
-          <a href="/partnerships" class="door">
-            <div>
+            <a href="/partnerships" class="audience-card audience-card-secondary" onclick="trackEvent('partnerships_card_click')">
               <div class="door-tag">For Spirits Brands &amp; Hospitality Groups</div>
-              <h3><em>Partnerships</em></h3>
-              <p>Private, branded deployments of Alchemixt for spirits brands, hotel operators, and education partners. Co-designed with our first enterprise partners, configured to your portfolio, your properties, or your curriculum.</p>
-            </div>
-            <div class="door-arrow">&#8594;</div>
-          </a>
+              <h3><em>Partnerships.</em></h3>
+              <p>Private, branded deployments for spirits brands, hotel operators, and education partners.</p>
+              <span class="audience-link">Explore partnerships &#8594;</span>
+            </a>
+          </div>
         </div>
       </section>
-
-      <section class="stage">
-        <div class="section-label">Who Built This</div>
-        <h2>Bootstrapped in New Orleans. <em>Built by hand.</em></h2>
-        <p class="body">
-          I'm Jason, the founder. Alchemixt is built in New Orleans and it is bootstrapped. I spent a decade in institutional finance before this, and I've bartended private events in New Orleans on the side for a while. I built Alchemixt because the tool I wanted didn't exist, and because no one I talked to in the cocktail world had one that did.
-        </p>
-        <p class="body">
-          The version of this project that took venture money, scaled fast, and chased consumer downloads would look completely different. It would probably also be worse. I'm taking a slower path because the craft this product serves is one I care about, and because I'd rather build something that lasts than something that trends. If that sounds like the kind of company you want to work with, any of the three doors above will take you somewhere useful.
-        </p>
-      </section>
-
     </div>
   </div>
 
-  <!-- DARK: CTA + FOOTER -->
+  <!-- ====== SOCIAL PROOF (hidden until testimonials exist) ====== -->
+  <!-- <div class="dark-bg" id="social-proof">
+    <div class="container">
+      <section>
+        <div class="section-label">Social Proof</div>
+        <h2>Used by people who take this <em>seriously.</em></h2>
+        <div class="testimonials">
+        </div>
+      </section>
+    </div>
+  </div> -->
+
+  <!-- ====== LIGHT: FOUNDER NOTE ====== -->
+  <div class="light-bg">
+    <div class="container">
+      <section class="founder">
+        <div class="section-label">Who Built This</div>
+        <h2>Built by hand. <em>Bootstrapped in New Orleans.</em></h2>
+        <div class="founder-content">
+          <div class="founder-copy">
+            <p class="body">
+              I'm Jason. I built Alchemixt because the tool I wanted didn't exist, and because I watched too many good bar programs pay consultants for work that should have compounded instead of evaporating after every quarterly refresh. It's bootstrapped, built in New Orleans, and made by hand. The version that took venture money and chased downloads would look completely different. It would probably also be worse. If that sounds like a product you want to use, the App Store buttons are at the top of this page.
+            </p>
+          </div>
+          <!-- Optional: founder photo. Uncomment when asset is ready.
+          <div class="founder-photo">
+            <img src="/images/home/jason.jpg" alt="Jason behind the bar in New Orleans" />
+          </div>
+          -->
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ====== DARK: CTA + FOOTER ====== -->
   <div class="dark-bg">
     <div class="container">
       <section class="cta">
@@ -154,6 +295,11 @@
           <img src="/logo.png" alt="Alchemixt" class="brand-logo" style="width:24px;height:24px;" />
           <span class="brand-text" style="font-size:15px;">Alchem<em>i</em>xt</span>
         </a>
+        <div class="footer-links">
+          <a href="/industry">For Bars</a>
+          <a href="/partnerships">For Brands</a>
+          <a href="/roadmap">Roadmap</a>
+        </div>
         <div class="colophon">
           A product of Point Forge Labs<br />
           New Orleans, Louisiana
@@ -161,6 +307,60 @@
       </footer>
     </div>
   </div>
+
+  <!-- ====== LAUNCH STATE TOGGLE + EMAIL CAPTURE ====== -->
+  <script>
+    // Toggle pre/live CTAs based on launch state
+    (function() {
+      if (LAUNCH_STATE === 'live') {
+        document.getElementById('cta-pre').style.display = 'none';
+        document.getElementById('cta-live').style.display = '';
+        document.getElementById('audience-cta-pre').style.display = 'none';
+        document.getElementById('audience-cta-live').style.display = '';
+        document.querySelectorAll('.store-badge').forEach(function(el) {
+          var img = el.querySelector('img');
+          if (img && img.alt.indexOf('App Store') !== -1) el.href = APP_STORE_URL;
+          if (img && img.alt.indexOf('Google Play') !== -1) el.href = PLAY_STORE_URL;
+        });
+      }
+    })();
+
+    // Beehiiv email capture
+    // Replace BEEHIIV_PUBLICATION_ID with your actual publication ID from Beehiiv
+    function handleEmailSubmit(e) {
+      e.preventDefault();
+      var form = e.target;
+      var emailInput = form.querySelector('input[type="email"]');
+      var email = emailInput.value;
+      var button = form.querySelector('button');
+      var originalText = button.textContent;
+
+      button.textContent = 'Sending...';
+      button.disabled = true;
+
+      fetch('https://api.beehiiv.com/v2/publications/BEEHIIV_PUBLICATION_ID/subscriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, reactivate_existing: true, send_welcome_email: true })
+      })
+      .then(function(res) {
+        if (res.ok || res.status === 201 || res.status === 200) {
+          button.textContent = "You're on the list!";
+          emailInput.value = '';
+          trackEvent('email_signup', { email: email });
+        } else {
+          button.textContent = 'Try again';
+          button.disabled = false;
+        }
+      })
+      .catch(function() {
+        button.textContent = 'Try again';
+        button.disabled = false;
+      });
+
+      return false;
+    }
+  </script>
 
 </body>
 </html>
