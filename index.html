@@ -325,26 +325,24 @@
       }
     })();
 
-    // Beehiiv email capture
-    // Replace BEEHIIV_PUBLICATION_ID with your actual publication ID from Beehiiv
+    // Email capture via Supabase Edge Function (proxies to Beehiiv)
     function handleEmailSubmit(e) {
       e.preventDefault();
       var form = e.target;
       var emailInput = form.querySelector('input[type="email"]');
       var email = emailInput.value;
       var button = form.querySelector('button');
-      var originalText = button.textContent;
 
       button.textContent = 'Sending...';
       button.disabled = true;
 
-      fetch('https://api.beehiiv.com/v2/publications/BEEHIIV_PUBLICATION_ID/subscriptions', {
+      fetch('https://tsupulkdyflmslpurmal.supabase.co/functions/v1/email-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, reactivate_existing: true, send_welcome_email: true })
+        body: JSON.stringify({ email: email })
       })
       .then(function(res) {
-        if (res.ok || res.status === 201 || res.status === 200) {
+        if (res.ok) {
           button.textContent = "You're on the list!";
           emailInput.value = '';
           trackEvent('email_signup', { email: email });
