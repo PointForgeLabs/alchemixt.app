@@ -1,14 +1,16 @@
 # lagniappeprovisions.co
 
-Marketing website for **Lagniappe Provisions** — a static, dependency-free site
-(plain HTML/CSS, no build step) designed to be served by GitHub Pages at
+Marketing website for **Lagniappe Provisions** — a small-batch cocktail syrup,
+bitters, and dehydrated fruit company based in New Orleans, majority woman-owned,
+founded by a 20-year bar professional. Static, dependency-free site (plain
+HTML/CSS, no build step) designed to be served by GitHub Pages at
 https://lagniappeprovisions.co.
 
 ## Contents
 
 | File | Purpose |
 |---|---|
-| `index.html` | Landing page: hero, lagniappe definition, provisions, story, email signup |
+| `index.html` | Landing page: hero, lagniappe definition, product lineup (syrups/bitters/dried fruit), story, email signup |
 | `styles.css` | All styling (Fraunces + Inter, cream/bayou-green/brass palette) |
 | `404.html` | Custom not-found page (GitHub Pages picks this up automatically) |
 | `favicon.svg` | Monogram favicon |
@@ -49,8 +51,9 @@ git push -u origin main
   `hello@lagniappeprovisions.co`.
 - **Contact email**: `hello@lagniappeprovisions.co` appears in `index.html`
   (config block, footer, JSON-LD) — update if you use a different address.
-- **Copy**: the product categories (pantry staples, spice & seasoning, gift
-  boxes) and story text are a starting brand voice — swap in the real offering.
+- **Copy**: product cards (syrups, bitters, dehydrated fruit) and the founder
+  story reflect the real business — refine specifics (flavors, SKUs, founder
+  name/bio) as they're finalized.
 - **Analytics**: no tracker is installed; add a GA4 snippet in `<head>` if wanted.
 - **OG image**: no `og:image` is set yet — add a 1200×630 image and the meta
   tags when brand art exists.

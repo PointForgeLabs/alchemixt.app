@@ -248,9 +248,10 @@ h3 {
   color: var(--ink);
 }
 .crate-sub {
-  font-size: 0.7rem;
-  letter-spacing: 0.26em;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
   color: var(--ink-soft);
+  white-space: nowrap;
 }
 .crate-rule {
   width: 56px; height: 2px;
