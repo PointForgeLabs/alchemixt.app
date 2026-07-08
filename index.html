@@ -40,6 +40,9 @@
 
   <!-- ====== LAUNCH STATE CONFIG ====== -->
   <script>
+    // Before switching to 'live': add /images/home/app-store-badge.svg and
+    // /images/home/google-play-badge.svg (official badge assets), and set the
+    // store URLs below — the live CTA references all three.
     var LAUNCH_STATE = 'pre'; // 'pre' or 'live'
     var APP_STORE_URL = '#';
     var PLAY_STORE_URL = '#';
@@ -334,7 +337,7 @@
         if (res.ok) {
           button.textContent = "You're on the list!";
           emailInput.value = '';
-          trackEvent('email_signup', { email: email });
+          trackEvent('email_signup');
         } else {
           button.textContent = 'Try again';
           button.disabled = false;
