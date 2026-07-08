@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lagniappe Provisions | A little something extra</title>
+  <meta name="description" content="Lagniappe Provisions — small-batch pantry goods and provisions from Louisiana, made the way things used to be made, with a little something extra in every box." />
+  <link rel="canonical" href="https://lagniappeprovisions.co/" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+
+  <meta property="og:title" content="Lagniappe Provisions | A little something extra" />
+  <meta property="og:description" content="Small-batch pantry goods and provisions from Louisiana, with a little something extra in every box." />
+  <meta property="og:url" content="https://lagniappeprovisions.co/" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Lagniappe Provisions" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Lagniappe Provisions | A little something extra" />
+  <meta name="twitter:description" content="Small-batch pantry goods and provisions from Louisiana, with a little something extra in every box." />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Lagniappe Provisions",
+    "url": "https://lagniappeprovisions.co/",
+    "email": "hello@lagniappeprovisions.co",
+    "description": "Small-batch pantry goods and provisions from Louisiana.",
+    "address": { "@type": "PostalAddress", "addressLocality": "New Orleans", "addressRegion": "LA", "addressCountry": "US" }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ====== SITE CONFIG ====== -->
+  <script>
+    // Set to a form endpoint (e.g. Formspree/Buttondown) to enable direct signup.
+    // While empty, the signup form falls back to a pre-filled email instead.
+    var FORM_ENDPOINT = '';
+    var CONTACT_EMAIL = 'hello@lagniappeprovisions.co';
+  </script>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="topbar">
+    <p>Now taking names for first pick of our opening run &mdash; <a href="#signup">join the list</a></p>
+  </div>
+
+  <div class="container">
+    <nav aria-label="Primary">
+      <a href="/" class="brand-mark" aria-label="Lagniappe Provisions home">
+        <svg class="brand-logo" viewBox="0 0 48 48" role="img" aria-hidden="true">
+          <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" stroke-width="2.5"/>
+          <path d="M18 13v20h13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M33 15.5v7M29.5 19h7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+        <span class="brand-block">
+          <span class="brand-text">Lagniappe Provisions</span>
+          <span class="brand-tagline">A little something extra</span>
+        </span>
+      </a>
+      <button class="nav-hamburger" aria-label="Open menu" aria-expanded="false"
+              onclick="this.classList.toggle('open'); this.setAttribute('aria-expanded', this.classList.contains('open')); document.getElementById('nav-links').classList.toggle('open');">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="nav-links" id="nav-links">
+        <a href="#provisions">Provisions</a>
+        <a href="#story">Our Story</a>
+        <a href="#lagniappe">What&rsquo;s Lagniappe?</a>
+        <a href="#signup" class="nav-cta">Join the List</a>
+      </div>
+    </nav>
+
+    <main id="main">
+
+      <!-- ====== HERO ====== -->
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="kicker">New Orleans, Louisiana</p>
+          <h1 class="display">A little something<br /><em>extra.</em></h1>
+          <p class="lede">
+            Small-batch pantry goods and provisions, made the slow way and sourced
+            close to home. Every order ships with lagniappe &mdash; because down here,
+            good measure means a little more than you asked for.
+          </p>
+          <div class="hero-actions">
+            <a href="#signup" class="btn btn-primary">Get first pick</a>
+            <a href="#story" class="btn btn-ghost">Read our story</a>
+          </div>
+        </div>
+        <div class="hero-panel" aria-hidden="true">
+          <div class="crate">
+            <span class="crate-stamp">EST. LOUISIANA</span>
+            <span class="crate-word">LAGNIAPPE</span>
+            <span class="crate-sub">PROVISIONS &amp; DRY GOODS</span>
+            <span class="crate-rule"></span>
+            <span class="crate-note">packed with a little extra</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ====== DEFINITION ====== -->
+      <section class="definition" id="lagniappe" aria-label="Definition of lagniappe">
+        <p class="def-word">lagniappe <span class="def-phonetic">/ &lsquo;lan-yap /</span> <span class="def-pos">noun</span></p>
+        <p class="def-body">
+          A small gift given with a purchase; a bonus or extra, offered by way of good measure.
+          A Louisiana custom &mdash; and the only way we know how to pack a box.
+        </p>
+      </section>
+
+      <!-- ====== PROVISIONS ====== -->
+      <section class="section" id="provisions">
+        <p class="kicker">What we make</p>
+        <h2>Provisions worth keeping in the pantry</h2>
+        <div class="card-grid">
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32"><path d="M11 4h10v4c2 1.5 3 3.5 3 6v12a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V14c0-2.5 1-4.5 3-6V4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 18h16" stroke="currentColor" stroke-width="2"/></svg>
+            </div>
+            <h3>Pantry Staples</h3>
+            <p>Jarred, bottled, and bagged goods made in small runs &mdash; the kind of staples that end up on the table more nights than not.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32"><path d="M16 4c3 4 8 6 8 13a8 8 0 1 1-16 0c0-7 5-9 8-13z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 19a4 4 0 0 0 4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+            <h3>Spice &amp; Seasoning</h3>
+            <p>Blends built on Gulf South cooking &mdash; deep, honest flavor that does the heavy lifting so weeknight cooking doesn&rsquo;t have to.</p>
+          </article>
+          <article class="card">
+            <div class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 32 32"><rect x="5" y="12" width="22" height="15" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M5 12l3-6h16l3 6M16 6v21" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            </div>
+            <h3>Gift Boxes</h3>
+            <p>Curated boxes for the people you owe a good turn. Packed by hand, finished with lagniappe, ready to give.</p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ====== STORY ====== -->
+      <section class="section section-story" id="story">
+        <div class="story-grid">
+          <div>
+            <p class="kicker">Our story</p>
+            <h2>Made the way things used to be made</h2>
+          </div>
+          <div class="story-copy">
+            <p>
+              Lagniappe Provisions started with a simple observation: the best things in a
+              Louisiana kitchen rarely come from a supermarket shelf. They come from somebody
+              who took their time &mdash; and then threw in a little extra when they handed it over.
+            </p>
+            <p>
+              We work in small batches, source as close to home as we can, and put our name on
+              every label. No shortcuts, no filler, no fine print. Just provisions we&rsquo;d be
+              proud to set on our own table.
+            </p>
+          </div>
+        </div>
+        <ul class="values" role="list">
+          <li><strong>Small batch.</strong> Made in runs we can stand behind, not warehouses we&rsquo;ve never seen.</li>
+          <li><strong>Sourced close to home.</strong> Gulf South first, Louisiana whenever we can.</li>
+          <li><strong>Always lagniappe.</strong> Every order ships with a little something extra. That&rsquo;s the whole point.</li>
+        </ul>
+      </section>
+
+      <!-- ====== SIGNUP ====== -->
+      <section class="section signup" id="signup">
+        <div class="signup-inner">
+          <p class="kicker">Opening soon</p>
+          <h2>Be first in line</h2>
+          <p class="lede">
+            We&rsquo;re packing our opening run now. Leave your email and you&rsquo;ll get first
+            pick before anything goes on the site &mdash; plus a little lagniappe in your first order.
+          </p>
+          <form id="signup-form" class="signup-form" novalidate>
+            <label class="visually-hidden" for="signup-email">Email address</label>
+            <input id="signup-email" name="email" type="email" required autocomplete="email" placeholder="you@example.com" />
+            <button type="submit" class="btn btn-primary">Join the list</button>
+          </form>
+          <p class="signup-note" id="signup-note">No spam, no noise. Just a note when the doors open.</p>
+        </div>
+      </section>
+
+    </main>
+
+    <footer>
+      <div class="footer-grid">
+        <div>
+          <p class="footer-brand">Lagniappe Provisions</p>
+          <p class="footer-sub">A little something extra &mdash; New Orleans, Louisiana</p>
+        </div>
+        <div class="footer-links">
+          <a href="mailto:hello@lagniappeprovisions.co">hello@lagniappeprovisions.co</a>
+          <a href="#lagniappe">What&rsquo;s lagniappe?</a>
+          <a href="#signup">Join the list</a>
+        </div>
+      </div>
+      <p class="footer-legal">&copy; <span id="year">2026</span> Lagniappe Provisions. All rights reserved.</p>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    document.getElementById('signup-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = document.getElementById('signup-email').value.trim();
+      var note = document.getElementById('signup-note');
+      if (!email || email.indexOf('@') < 1) {
+        note.textContent = 'Please enter a valid email address.';
+        return;
+      }
+      if (FORM_ENDPOINT) {
+        fetch(FORM_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ email: email })
+        }).then(function (res) {
+          note.textContent = res.ok
+            ? 'You’re on the list. Talk soon.'
+            : 'Something went wrong — email us at ' + CONTACT_EMAIL + ' and we’ll add you.';
+        }).catch(function () {
+          note.textContent = 'Something went wrong — email us at ' + CONTACT_EMAIL + ' and we’ll add you.';
+        });
+      } else {
+        // No form backend configured yet: hand off to the visitor's mail client.
+        window.location.href = 'mailto:' + CONTACT_EMAIL
+          + '?subject=' + encodeURIComponent('Add me to the Lagniappe Provisions list')
+          + '&body=' + encodeURIComponent('Please add ' + email + ' to the launch list.');
+        note.textContent = 'Opening your email app — or write us at ' + CONTACT_EMAIL + '.';
+      }
+    });
+  </script>
+</body>
+</html>
