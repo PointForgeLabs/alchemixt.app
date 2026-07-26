@@ -119,6 +119,15 @@ function updateStats(stats, drawing) {
   const page = pageSize(state);
   el('stat-page').textContent = `${page.w.toFixed(0)} × ${page.h.toFixed(0)} mm`;
   el('stat-raster').textContent = `${drawing.fields.width} × ${drawing.fields.height} px`;
+  const targets = el('stat-targets');
+  targets.textContent = drawing.fields.targetConfig || '—';
+  // A fallback configuration is worth noticing: two-pass modes march the scene
+  // twice, and half-float slightly coarsens the engraving.
+  const fallback = renderer.configIndex > 0;
+  targets.title = fallback
+    ? 'Fallback render targets — your GPU refused the preferred configuration.'
+    : '';
+  targets.style.color = fallback ? 'var(--gold)' : '';
   el('stat-strokes').textContent = stats.strokes.toLocaleString();
   el('stat-points').textContent = stats.points.toLocaleString();
   el('stat-draw').textContent = `${(stats.drawMm / 1000).toFixed(1)} m`;
@@ -279,6 +288,8 @@ async function boot() {
     exportSvg: () => exportSvgText(),
     exportGcode: () => toGcode(current.drawing, current.layers),
     plan: () => planPlate(state),
+    targetConfig: () => (renderer.config ? renderer.config.id : 'none'),
+    gpu: () => renderer.debugInfo,
     bounds: () => {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;
       for (const l of current.layers) {

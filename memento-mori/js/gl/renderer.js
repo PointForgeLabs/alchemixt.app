@@ -82,6 +82,29 @@ const UNIFORM_NAMES = [
   'uContrast', 'uGammaP', 'uCavity', 'uNear', 'uFar',
 ];
 
+/**
+ * Render-target configurations, best first.
+ *
+ * The shader writes four outputs. Four simultaneous RGBA32F attachments is 512
+ * bits per pixel, and plenty of real GL drivers answer that with
+ * FRAMEBUFFER_UNSUPPORTED (0x8CDD) even though they advertise four draw buffers
+ * and EXT_color_buffer_float. So the pixel format and the number of attachments
+ * are both negotiable: with two attachments the same shader runs twice, writing
+ * outputs 0-1 on the first pass and 2-3 on the second, which halves the
+ * attachment pressure at the cost of marching the scene twice.
+ *
+ * Half-float keeps everything except the surface parameterisation, which spans
+ * a couple of hundred millimetres of arc length -- 16-bit floats quantise that to
+ * about an eighth of a millimetre, which is a visible fraction of the engraving
+ * pitch, so it is the last resort rather than the first.
+ */
+const TARGET_CONFIGS = [
+  { id: '4 × RGBA32F', float: true, attachments: 4, passes: 1 },
+  { id: '2 × RGBA32F, 2 passes', float: true, attachments: 2, passes: 2 },
+  { id: '4 × RGBA16F', float: false, attachments: 4, passes: 1 },
+  { id: '2 × RGBA16F, 2 passes', float: false, attachments: 2, passes: 2 },
+];
+
 export class SkullRenderer {
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -99,7 +122,29 @@ export class SkullRenderer {
     if (!this.floatExt && !this.halfExt) {
       throw new Error('Floating-point render targets are required (EXT_color_buffer_float).');
     }
-    this.internalFormat = this.floatExt ? gl.RGBA32F : gl.RGBA16F;
+
+    const maxDraw = gl.getParameter(gl.MAX_DRAW_BUFFERS);
+    const maxColour = gl.getParameter(gl.MAX_COLOR_ATTACHMENTS);
+    this.configs = TARGET_CONFIGS.filter((c) => {
+      if (c.float && !this.floatExt) return false;
+      // Two-pass mode addresses attachment points 2 and 3 on its second pass.
+      const highest = c.passes * c.attachments;
+      return highest <= Math.min(maxDraw, maxColour);
+    });
+    if (!this.configs.length) {
+      throw new Error(
+        `This GPU exposes only ${maxDraw} draw buffers and ${maxColour} colour ` +
+        `attachments, which is below what WebGL2 guarantees.`
+      );
+    }
+    // Setting window.__MM_TARGETS to a configuration index starts the ladder
+    // lower down, which is the only way to exercise the fallbacks on a GPU that
+    // happily accepts the first one.
+    const forced = Number(globalThis.__MM_TARGETS);
+    this.configIndex = Number.isInteger(forced) && forced >= 0 && forced < this.configs.length
+      ? forced : 0;
+    this.config = null;
+    this.debugInfo = this._describeGpu();
 
     this.program = this._buildProgram();
     this.loc = {};
@@ -114,8 +159,9 @@ export class SkullRenderer {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     gl.bindVertexArray(null);
 
-    this.fbo = null;
+    this.fbos = [];
     this.targets = [];
+    this.drawLists = [];
     this.tileW = 0;
     this.tileH = 0;
   }
@@ -147,34 +193,111 @@ export class SkullRenderer {
     return p;
   }
 
-  _ensureTargets(w, h) {
-    if (this.tileW === w && this.tileH === h) return;
+  _describeGpu() {
     const gl = this.gl;
-    if (this.fbo) gl.deleteFramebuffer(this.fbo);
-    for (const t of this.targets) gl.deleteTexture(t);
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const get = (p) => { try { return gl.getParameter(p); } catch { return '?'; } };
+    return {
+      renderer: dbg ? get(dbg.UNMASKED_RENDERER_WEBGL) : get(gl.RENDERER),
+      vendor: dbg ? get(dbg.UNMASKED_VENDOR_WEBGL) : get(gl.VENDOR),
+      maxDrawBuffers: get(gl.MAX_DRAW_BUFFERS),
+      maxColorAttachments: get(gl.MAX_COLOR_ATTACHMENTS),
+      maxTextureSize: get(gl.MAX_TEXTURE_SIZE),
+      float32: !!this.floatExt,
+      float16: !!this.halfExt,
+    };
+  }
+
+  _releaseTargets() {
+    const gl = this.gl;
+    for (const f of this.fbos || []) gl.deleteFramebuffer(f);
+    for (const t of this.targets || []) gl.deleteTexture(t);
+    this.fbos = [];
     this.targets = [];
-    this.fbo = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-    const attach = [];
-    for (let i = 0; i < 4; i++) {
+    this.tileW = 0;
+    this.tileH = 0;
+  }
+
+  /**
+   * Try to allocate one configuration at this size. Returns the framebuffer
+   * status, so the caller can report why a configuration was rejected.
+   */
+  _tryBuild(cfg, w, h) {
+    const gl = this.gl;
+    const fmt = cfg.float ? gl.RGBA32F : gl.RGBA16F;
+
+    for (let i = 0; i < cfg.attachments; i++) {
       const tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texStorage2D(gl.TEXTURE_2D, 1, this.internalFormat, w, h);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, fmt, w, h);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + i, gl.TEXTURE_2D, tex, 0);
-      attach.push(gl.COLOR_ATTACHMENT0 + i);
       this.targets.push(tex);
     }
-    gl.drawBuffers(attach);
-    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    if (status !== gl.FRAMEBUFFER_COMPLETE) {
-      throw new Error(`Framebuffer incomplete (0x${status.toString(16)}).`);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    // One framebuffer per pass. ES 3.0 requires drawBuffers[i] to be either NONE
+    // or COLOR_ATTACHMENTi exactly, so pass 1 has to hang the same textures off
+    // attachment points 2 and 3 rather than remapping the outputs.
+    this.drawLists = [];
+    for (let p = 0; p < cfg.passes; p++) {
+      const fbo = gl.createFramebuffer();
+      this.fbos.push(fbo);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      const list = new Array(p * cfg.attachments).fill(gl.NONE);
+      for (let k = 0; k < cfg.attachments; k++) {
+        const slot = p * cfg.attachments + k;
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + slot,
+                                gl.TEXTURE_2D, this.targets[k], 0);
+        list.push(gl.COLOR_ATTACHMENT0 + slot);
+      }
+      gl.drawBuffers(list);
+      this.drawLists.push(list);
+      const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      if (status !== gl.FRAMEBUFFER_COMPLETE) return status;
     }
-    this.canvas.width = Math.max(this.canvas.width, w);
-    this.canvas.height = Math.max(this.canvas.height, h);
-    this.tileW = w;
-    this.tileH = h;
+    return gl.FRAMEBUFFER_COMPLETE;
+  }
+
+  _ensureTargets(w, h) {
+    if (this.tileW === w && this.tileH === h && this.fbos && this.fbos.length) return;
+    const gl = this.gl;
+    this._releaseTargets();
+
+    const rejected = [];
+    for (let i = this.configIndex; i < this.configs.length; i++) {
+      const cfg = this.configs[i];
+      let status;
+      try {
+        status = this._tryBuild(cfg, w, h);
+      } catch (err) {
+        status = -1;
+        rejected.push(`${cfg.id}: ${err.message}`);
+      }
+      // A rejected configuration leaves the error flag set; drain it so the next
+      // attempt is not diagnosed with a stale error.
+      while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
+
+      if (status === gl.FRAMEBUFFER_COMPLETE) {
+        this.configIndex = i;          // do not retry configurations already refused
+        this.config = cfg;
+        this.canvas.width = Math.max(this.canvas.width, w);
+        this.canvas.height = Math.max(this.canvas.height, h);
+        this.tileW = w;
+        this.tileH = h;
+        return;
+      }
+      if (status >= 0) rejected.push(`${cfg.id}: 0x${status.toString(16)}`);
+      this._releaseTargets();
+    }
+
+    const d = this.debugInfo;
+    throw new Error(
+      `No usable render-target configuration at ${w}x${h}.\n` +
+      `Tried — ${rejected.join('; ')}\n` +
+      `GPU: ${d.vendor} / ${d.renderer}; draw buffers ${d.maxDrawBuffers}, ` +
+      `attachments ${d.maxColorAttachments}, float32 ${d.float32}, float16 ${d.float16}`
+    );
   }
 
   /**
@@ -199,7 +322,6 @@ export class SkullRenderer {
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
     gl.disable(gl.DEPTH_TEST);
     gl.disable(gl.BLEND);
 
@@ -255,6 +377,7 @@ export class SkullRenderer {
     const n = width * height;
     const fields = {
       width, height, cam, rot,
+      targetConfig: this.config.id,
       depth: new Float32Array(n),
       nx: new Float32Array(n), ny: new Float32Array(n), nz: new Float32Array(n),
       lum: new Float32Array(n), ao: new Float32Array(n),
@@ -268,17 +391,26 @@ export class SkullRenderer {
     const scratch = new Float32Array(width * band * 4);
     const bands = Math.ceil(height / band);
 
+    const { attachments, passes } = this.config;
     for (let bi = 0; bi < bands; bi++) {
       const y0 = bi * band;                 // GL rows, measured from the bottom
       const rows = Math.min(band, height - y0);
-      gl.viewport(0, 0, width, rows);
       gl.uniform2f(u.uTileOrigin, 0, y0);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-      for (let a = 0; a < 4; a++) {
-        gl.readBuffer(gl.COLOR_ATTACHMENT0 + a);
-        gl.readPixels(0, 0, width, rows, gl.RGBA, gl.FLOAT, scratch);
-        this._scatter(fields, scratch, width, height, y0, rows, a);
+      // In two-attachment mode the scene is marched once per pass, each pass
+      // keeping a different half of the shader's outputs.
+      for (let pass = 0; pass < passes; pass++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos[pass]);
+        gl.drawBuffers(this.drawLists[pass]);
+        gl.viewport(0, 0, width, rows);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        for (let k = 0; k < attachments; k++) {
+          const slot = pass * attachments + k;
+          gl.readBuffer(gl.COLOR_ATTACHMENT0 + slot);
+          gl.readPixels(0, 0, width, rows, gl.RGBA, gl.FLOAT, scratch);
+          this._scatter(fields, scratch, width, height, y0, rows, slot);
+        }
       }
       if (onProgress) onProgress((bi + 1) / bands);
       // Yield so the page stays responsive and the driver can breathe.
@@ -330,9 +462,7 @@ export class SkullRenderer {
   }
 
   dispose() {
-    const gl = this.gl;
-    if (this.fbo) gl.deleteFramebuffer(this.fbo);
-    for (const t of this.targets) gl.deleteTexture(t);
-    gl.deleteProgram(this.program);
+    this._releaseTargets();
+    this.gl.deleteProgram(this.program);
   }
 }
