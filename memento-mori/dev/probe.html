@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<!--
+  Development probe. Renders the raw G-buffer to canvases so the SDF anatomy and
+  shading can be inspected directly, without the line-art stage in the way.
+  Served locally and driven by dev/shoot.mjs; not linked from the app.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>memento mori · G-buffer probe</title>
+  <style>
+    body { background:#111; color:#ddd; font:13px ui-monospace,monospace; margin:12px; }
+    canvas { image-rendering: pixelated; border:1px solid #333; background:#fff; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    figure { margin:0; }
+    figcaption { font-size:11px; opacity:.7; padding-top:2px; }
+    #err { color:#f66; white-space:pre-wrap; font-size:12px; }
+  </style>
+</head>
+<body>
+<div id="err"></div>
+<div class="row" id="out"></div>
+<script type="module">
+import { SkullRenderer } from '../js/gl/renderer.js';
+import { DEFAULTS } from '../js/params.js';
+
+const err = document.getElementById('err');
+const out = document.getElementById('out');
+
+function show(label, w, h, paint) {
+  const fig = document.createElement('figure');
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(w, h);
+  paint(img.data);
+  ctx.putImageData(img, 0, 0);
+  fig.appendChild(c);
+  const cap = document.createElement('figcaption');
+  cap.textContent = label;
+  fig.appendChild(cap);
+  out.appendChild(fig);
+}
+
+window.__probe = async (overrides = {}, w = 260, h = 340) => {
+  out.innerHTML = '';
+  const params = { ...DEFAULTS, ...overrides };
+  const r = new SkullRenderer();
+  const t0 = performance.now();
+  const f = await r.render({ width: w, height: h, params, bandRows: 64 });
+  const ms = Math.round(performance.now() - t0);
+
+  show(`luminance (${ms}ms)`, w, h, (d) => {
+    for (let i = 0; i < w * h; i++) {
+      const v = f.mask[i] ? Math.round(f.lum[i] * 255) : 255;
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+      d[i * 4 + 3] = 255;
+    }
+  });
+  show('normal', w, h, (d) => {
+    for (let i = 0; i < w * h; i++) {
+      d[i * 4] = f.mask[i] ? (f.nx[i] * 0.5 + 0.5) * 255 : 255;
+      d[i * 4 + 1] = f.mask[i] ? (f.ny[i] * 0.5 + 0.5) * 255 : 255;
+      d[i * 4 + 2] = f.mask[i] ? (f.nz[i] * 0.5 + 0.5) * 255 : 255;
+      d[i * 4 + 3] = 255;
+    }
+  });
+  show('depth', w, h, (d) => {
+    let lo = 1, hi = 0;
+    for (let i = 0; i < w * h; i++) if (f.mask[i]) { lo = Math.min(lo, f.depth[i]); hi = Math.max(hi, f.depth[i]); }
+    for (let i = 0; i < w * h; i++) {
+      const v = f.mask[i] ? 255 - Math.round(((f.depth[i] - lo) / Math.max(hi - lo, 1e-6)) * 255) : 255;
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+      d[i * 4 + 3] = 255;
+    }
+  });
+  show('region', w, h, (d) => {
+    const pal = [[255,255,255],[210,90,90],[240,170,60],[120,190,120],[70,70,150],[200,120,200],
+                 [90,190,210],[230,120,60],[140,140,220],[110,210,160],[210,210,90],[160,110,80],[100,100,100]];
+    for (let i = 0; i < w * h; i++) {
+      const c = f.mask[i] ? (pal[Math.round(f.region[i])] || [0,0,0]) : [255,255,255];
+      d[i * 4] = c[0]; d[i * 4 + 1] = c[1]; d[i * 4 + 2] = c[2]; d[i * 4 + 3] = 255;
+    }
+  });
+  show('form V (bands)', w, h, (d) => {
+    for (let i = 0; i < w * h; i++) {
+      const band = f.mask[i] ? (Math.floor(f.formV[i] / 3) % 2 ? 40 : 235) : 255;
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = band;
+      d[i * 4 + 3] = 255;
+    }
+  });
+  show('AO', w, h, (d) => {
+    for (let i = 0; i < w * h; i++) {
+      const v = f.mask[i] ? Math.round(f.ao[i] * 255) : 255;
+      d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+      d[i * 4 + 3] = 255;
+    }
+  });
+  r.dispose();
+  return { ms, w, h };
+};
+
+window.addEventListener('error', (e) => { err.textContent += `\n${e.message}`; });
+window.addEventListener('unhandledrejection', (e) => { err.textContent += `\n${e.reason}`; });
+window.__ready = true;
+</script>
+</body>
+</html>

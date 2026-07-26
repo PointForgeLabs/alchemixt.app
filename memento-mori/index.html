@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memento Mori — a generative plate for pen plotters</title>
+  <meta name="description" content="Generates anatomically modelled skull engravings as clean single-stroke vectors for pen plotters. Real 3D form, copperplate hatching, millimetre-accurate SVG, G-code and HPGL." />
+  <link rel="canonical" href="https://alchemixt.app/memento-mori/" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="icon" type="image/png" href="/favicon.png?v=2" />
+  <link rel="stylesheet" href="./css/app.css" />
+
+  <meta property="og:title" content="Memento Mori — generative plates for pen plotters" />
+  <meta property="og:description" content="An anatomically modelled skull, raymarched and cut into copperplate line work your plotter can draw." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://alchemixt.app/memento-mori/" />
+</head>
+<body>
+
+<header class="topbar">
+  <a class="home" href="/" title="Alchemixt">
+    <img src="/logo.png" alt="" />
+  </a>
+  <div class="titles">
+    <h1>Memento Mori</h1>
+    <p>Generative skull plates for pen plotters</p>
+  </div>
+
+  <div class="toolbar">
+    <button id="btn-panel-toggle" class="ghost" title="Hide the controls">☰</button>
+    <button id="btn-shuffle" class="ghost">Shuffle</button>
+    <button id="btn-render" class="primary">Render plate</button>
+    <span class="divider"></span>
+    <label class="inline">
+      View
+      <select id="view-mode">
+        <option value="plot">Pen plot</option>
+        <option value="layers">Layers in colour</option>
+        <option value="reference">3D render</option>
+        <option value="ink">Ink demand</option>
+      </select>
+    </label>
+    <label class="inline check">
+      <input type="checkbox" id="show-travel" /> Travel
+    </label>
+    <span class="divider"></span>
+    <button id="btn-svg" class="primary">SVG</button>
+    <button id="btn-gcode" class="ghost">G-code</button>
+    <button id="btn-hpgl" class="ghost">HPGL</button>
+    <button id="btn-png" class="ghost">PNG proof</button>
+    <button id="btn-link" class="ghost" title="Copy a permalink to this plate">Link</button>
+  </div>
+</header>
+
+<div class="statusbar">
+  <span id="status-text">Starting…</span>
+  <span class="progress"><i id="progress-bar"></i></span>
+</div>
+
+<main class="layout">
+  <aside class="panel">
+    <div id="panel-body" class="panel-body"></div>
+
+    <div class="panel-stats">
+      <h2>Plate</h2>
+      <dl>
+        <dt>Paper</dt><dd id="stat-page">—</dd>
+        <dt>Raster</dt><dd id="stat-raster">—</dd>
+        <dt>Strokes</dt><dd id="stat-strokes">—</dd>
+        <dt>Points</dt><dd id="stat-points">—</dd>
+        <dt>Ink down</dt><dd id="stat-draw">—</dd>
+        <dt>Pen up</dt><dd id="stat-travel">—</dd>
+        <dt>Est. plot</dt><dd id="stat-time">—</dd>
+      </dl>
+      <h2>Layers</h2>
+      <ul id="layer-list" class="layer-list"></ul>
+    </div>
+  </aside>
+
+  <section id="preview-wrap" class="preview-wrap">
+    <div id="error-box" class="error" hidden></div>
+    <canvas id="preview-canvas"></canvas>
+  </section>
+</main>
+
+<footer class="notes">
+  <details>
+    <summary>How this works, and how to plot it</summary>
+    <div class="notes-body">
+      <p>
+        The skull is not a photograph or a traced drawing. It is a signed distance
+        field built from about sixty anatomical primitives — cranial vault, orbits,
+        zygomatic arches, nasal aperture, thirty-two individually placed teeth, a
+        jointed mandible — raymarched on the GPU into depth, surface normal,
+        ambient occlusion and lit luminance buffers.
+      </p>
+      <p>
+        Those buffers are then cut into line work. Contours come from depth and
+        normal discontinuities, so they follow real form rather than the lighting.
+        The primary engraving lines are isolines of a per-region surface
+        parameterisation, which is why they wrap the cranium, circle the orbits and
+        run vertically over the teeth instead of lying across everything at one
+        angle. Tone is built the way an engraver builds it: four passes whose duty
+        cycle rises with the local ink demand, so light areas break into ticks and
+        dark ones close up solid. Sutures and cracks are traced in model space, so
+        they sit on the surface and are hidden correctly where the form turns away.
+      </p>
+      <h3>Plotting notes</h3>
+      <ul>
+        <li>
+          Set <strong>Pen width</strong> to your actual pen and keep
+          <strong>Engraving pitch</strong> at roughly 2–3× that. Tighter and the
+          passes merge into solid black on paper even though the preview looks fine.
+        </li>
+        <li>
+          The SVG is in real millimetres with a matching <code>viewBox</code>, so
+          Inkscape, <em>vpype</em> and the AxiDraw extension all open it at true
+          size with no scaling step.
+        </li>
+        <li>
+          Layers are named <code>1-Contour</code>, <code>2-Sutures &amp; cracks</code>
+          and so on. The AxiDraw extension reads that leading number for per-layer
+          pen height and speed; set <strong>Layers</strong> to <em>Split by tone</em>
+          for a three-pen plate.
+        </li>
+        <li>
+          <strong>Optimise pen travel</strong> welds touching strokes and reorders
+          them. On a dense plate it routinely halves the pen-up distance — check the
+          before-and-after under <em>Travel</em>.
+        </li>
+        <li>
+          Prefer to trace it yourself? Switch the view to <em>3D render</em> and
+          export a <strong>PNG proof</strong> — that is the underlying render at
+          full resolution, ready for Inkscape's trace or your own halftone
+          workflow.
+        </li>
+      </ul>
+      <p class="fineprint">
+        Every plate is a pure function of its seed and settings — the
+        <strong>Link</strong> button captures the lot, so a plate you liked can
+        always be brought back exactly.
+      </p>
+    </div>
+  </details>
+</footer>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
