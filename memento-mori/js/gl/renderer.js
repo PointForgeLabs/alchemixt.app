@@ -83,27 +83,45 @@ const UNIFORM_NAMES = [
 ];
 
 /**
- * Render-target configurations, best first.
+ * Render-target configurations, tried in order.
  *
- * The shader writes four outputs. Four simultaneous RGBA32F attachments is 512
- * bits per pixel, and plenty of real GL drivers answer that with
- * FRAMEBUFFER_UNSUPPORTED (0x8CDD) even though they advertise four draw buffers
- * and EXT_color_buffer_float. So the pixel format and the number of attachments
- * are both negotiable: with two attachments the same shader runs twice, writing
- * outputs 0-1 on the first pass and 2-3 on the second, which halves the
- * attachment pressure at the cost of marching the scene twice.
+ * The shader writes four outputs, and there is no single allocation recipe that
+ * every driver accepts. Real GPUs return FRAMEBUFFER_UNSUPPORTED (0x8CDD) for
+ * combinations they advertise as supported, so three independent axes are all
+ * treated as negotiable:
  *
- * Half-float keeps everything except the surface parameterisation, which spans
- * a couple of hundred millimetres of arc length -- 16-bit floats quantise that to
- * about an eighth of a millimetre, which is a visible fraction of the engraving
- * pitch, so it is the last resort rather than the first.
+ *  storage     Renderbuffers first. These attachments are only ever drawn to and
+ *              read back with readPixels -- never sampled -- so a renderbuffer is
+ *              both the correct choice and the one with the fewest completeness
+ *              rules attached to it. Immutable (texStorage2D) and mutable
+ *              (texImage2D) textures follow, because some drivers reject one
+ *              float path while accepting the other.
+ *  format      RGBA32F before RGBA16F. Half-float quantises the surface
+ *              parameterisation -- a couple of hundred millimetres of arc length --
+ *              to roughly an eighth of a millimetre, a visible fraction of the
+ *              engraving pitch.
+ *  attachments Four at once, or two with the shader run twice (outputs 0-1 then
+ *              2-3). Halves the attachment pressure; costs a second march.
  */
-const TARGET_CONFIGS = [
-  { id: '4 × RGBA32F', float: true, attachments: 4, passes: 1 },
-  { id: '2 × RGBA32F, 2 passes', float: true, attachments: 2, passes: 2 },
-  { id: '4 × RGBA16F', float: false, attachments: 4, passes: 1 },
-  { id: '2 × RGBA16F, 2 passes', float: false, attachments: 2, passes: 2 },
+const STORAGE_KINDS = [
+  { id: 'RB', label: 'renderbuffer' },
+  { id: 'TS', label: 'texStorage' },
+  { id: 'TI', label: 'texImage' },
 ];
+
+const TARGET_CONFIGS = [];
+for (const float of [true, false]) {
+  for (const { attachments, passes } of [{ attachments: 4, passes: 1 }, { attachments: 2, passes: 2 }]) {
+    for (const storage of STORAGE_KINDS) {
+      TARGET_CONFIGS.push({
+        float, attachments, passes, storage: storage.id,
+        id: `${attachments} × RGBA${float ? 32 : 16}F` +
+            `${passes > 1 ? `, ${passes} passes` : ''} (${storage.label})`,
+        short: `${storage.id}/${float ? 32 : 16}F/${attachments}x${passes}`,
+      });
+    }
+  }
+}
 
 export class SkullRenderer {
   constructor() {
@@ -128,8 +146,7 @@ export class SkullRenderer {
     this.configs = TARGET_CONFIGS.filter((c) => {
       if (c.float && !this.floatExt) return false;
       // Two-pass mode addresses attachment points 2 and 3 on its second pass.
-      const highest = c.passes * c.attachments;
-      return highest <= Math.min(maxDraw, maxColour);
+      return c.passes * c.attachments <= Math.min(maxDraw, maxColour);
     });
     if (!this.configs.length) {
       throw new Error(
@@ -141,8 +158,9 @@ export class SkullRenderer {
     // lower down, which is the only way to exercise the fallbacks on a GPU that
     // happily accepts the first one.
     const forced = Number(globalThis.__MM_TARGETS);
-    this.configIndex = Number.isInteger(forced) && forced >= 0 && forced < this.configs.length
+    this.startIndex = Number.isInteger(forced) && forced >= 0 && forced < this.configs.length
       ? forced : 0;
+    this.configIndex = this.startIndex;
     this.config = null;
     this.debugInfo = this._describeGpu();
 
@@ -160,10 +178,42 @@ export class SkullRenderer {
     gl.bindVertexArray(null);
 
     this.fbos = [];
-    this.targets = [];
+    this.textures = [];
+    this.renderbuffers = [];
     this.drawLists = [];
     this.tileW = 0;
     this.tileH = 0;
+
+    // Probe the whole matrix small and cheap, before anything depends on it.
+    // Configurations the driver refuses at 64x64 are dropped, so the first real
+    // render does not waste attempts on them; the record is kept either way,
+    // because "refused at every size" and "refused only when large" are
+    // different faults and the error message should be able to tell them apart.
+    this.probe = this._probeMatrix(64, 64);
+    const viable = this.configs.filter((c) => this.probe[c.short] === 'ok');
+    if (viable.length) this.configs = viable;
+    this.startIndex = Math.min(this.startIndex, this.configs.length - 1);
+    this.configIndex = this.startIndex;
+  }
+
+  _probeMatrix(w, h) {
+    const gl = this.gl;
+    const out = {};
+    for (const cfg of this.configs) {
+      let status;
+      try {
+        status = this._tryBuild(cfg, w, h);
+      } catch (err) {
+        status = -1;
+      }
+      while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
+      out[cfg.short] = status === gl.FRAMEBUFFER_COMPLETE ? 'ok'
+        : status === -2 ? 'storage'
+        : status === -1 ? 'threw'
+        : `0x${status.toString(16)}`;
+      this._releaseTargets();
+    }
+    return out;
   }
 
   _buildProgram() {
@@ -203,43 +253,71 @@ export class SkullRenderer {
       maxDrawBuffers: get(gl.MAX_DRAW_BUFFERS),
       maxColorAttachments: get(gl.MAX_COLOR_ATTACHMENTS),
       maxTextureSize: get(gl.MAX_TEXTURE_SIZE),
+      maxRenderbufferSize: get(gl.MAX_RENDERBUFFER_SIZE),
       float32: !!this.floatExt,
       float16: !!this.halfExt,
+      floatBlend: !!gl.getExtension('EXT_float_blend'),
     };
   }
 
   _releaseTargets() {
     const gl = this.gl;
     for (const f of this.fbos || []) gl.deleteFramebuffer(f);
-    for (const t of this.targets || []) gl.deleteTexture(t);
+    for (const t of this.textures || []) gl.deleteTexture(t);
+    for (const r of this.renderbuffers || []) gl.deleteRenderbuffer(r);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     this.fbos = [];
-    this.targets = [];
+    this.textures = [];
+    this.renderbuffers = [];
+    this.drawLists = [];
     this.tileW = 0;
     this.tileH = 0;
   }
 
   /**
    * Try to allocate one configuration at this size. Returns the framebuffer
-   * status, so the caller can report why a configuration was rejected.
+   * status so the caller can report why a configuration was rejected.
    */
   _tryBuild(cfg, w, h) {
     const gl = this.gl;
     const fmt = cfg.float ? gl.RGBA32F : gl.RGBA16F;
+    const attachFns = [];
 
     for (let i = 0; i < cfg.attachments; i++) {
-      const tex = gl.createTexture();
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texStorage2D(gl.TEXTURE_2D, 1, fmt, w, h);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      this.targets.push(tex);
+      if (cfg.storage === 'RB') {
+        const rb = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, rb);
+        gl.renderbufferStorage(gl.RENDERBUFFER, fmt, w, h);
+        this.renderbuffers.push(rb);
+        attachFns.push((slot) => gl.framebufferRenderbuffer(
+          gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + slot, gl.RENDERBUFFER, rb));
+      } else {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        if (cfg.storage === 'TS') {
+          gl.texStorage2D(gl.TEXTURE_2D, 1, fmt, w, h);
+        } else {
+          gl.texImage2D(gl.TEXTURE_2D, 0, fmt, w, h, 0, gl.RGBA, gl.FLOAT, null);
+        }
+        // NEAREST and CLAMP_TO_EDGE: a float texture is not filterable without
+        // OES_texture_float_linear, and the default REPEAT wrap is a completeness
+        // hazard some drivers report as an unsupported framebuffer.
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        this.textures.push(tex);
+        attachFns.push((slot) => gl.framebufferTexture2D(
+          gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + slot, gl.TEXTURE_2D, tex, 0));
+      }
     }
     gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+    if (gl.getError() !== gl.NO_ERROR) return -2;   // storage allocation refused
 
     // One framebuffer per pass. ES 3.0 requires drawBuffers[i] to be either NONE
-    // or COLOR_ATTACHMENTi exactly, so pass 1 has to hang the same textures off
-    // attachment points 2 and 3 rather than remapping the outputs.
-    this.drawLists = [];
+    // or COLOR_ATTACHMENTi exactly, so pass 1 has to hang the same attachments
+    // off points 2 and 3 rather than remapping the shader's outputs.
     for (let p = 0; p < cfg.passes; p++) {
       const fbo = gl.createFramebuffer();
       this.fbos.push(fbo);
@@ -247,8 +325,7 @@ export class SkullRenderer {
       const list = new Array(p * cfg.attachments).fill(gl.NONE);
       for (let k = 0; k < cfg.attachments; k++) {
         const slot = p * cfg.attachments + k;
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0 + slot,
-                                gl.TEXTURE_2D, this.targets[k], 0);
+        attachFns[k](slot);
         list.push(gl.COLOR_ATTACHMENT0 + slot);
       }
       gl.drawBuffers(list);
@@ -259,6 +336,10 @@ export class SkullRenderer {
     return gl.FRAMEBUFFER_COMPLETE;
   }
 
+  /**
+   * Walk the ladder until something is complete at this size. Refused
+   * configurations are never retried, so the cost is paid once.
+   */
   _ensureTargets(w, h) {
     if (this.tileW === w && this.tileH === h && this.fbos && this.fbos.length) return;
     const gl = this.gl;
@@ -272,14 +353,14 @@ export class SkullRenderer {
         status = this._tryBuild(cfg, w, h);
       } catch (err) {
         status = -1;
-        rejected.push(`${cfg.id}: ${err.message}`);
+        rejected.push(`${cfg.short}: threw ${err.message}`);
       }
       // A rejected configuration leaves the error flag set; drain it so the next
       // attempt is not diagnosed with a stale error.
       while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
 
       if (status === gl.FRAMEBUFFER_COMPLETE) {
-        this.configIndex = i;          // do not retry configurations already refused
+        this.configIndex = i;
         this.config = cfg;
         this.canvas.width = Math.max(this.canvas.width, w);
         this.canvas.height = Math.max(this.canvas.height, h);
@@ -287,16 +368,21 @@ export class SkullRenderer {
         this.tileH = h;
         return;
       }
-      if (status >= 0) rejected.push(`${cfg.id}: 0x${status.toString(16)}`);
+      if (status === -2) rejected.push(`${cfg.short}: storage refused`);
+      else if (status >= 0) rejected.push(`${cfg.short}: 0x${status.toString(16)}`);
       this._releaseTargets();
     }
 
     const d = this.debugInfo;
     throw new Error(
-      `No usable render-target configuration at ${w}x${h}.\n` +
-      `Tried — ${rejected.join('; ')}\n` +
-      `GPU: ${d.vendor} / ${d.renderer}; draw buffers ${d.maxDrawBuffers}, ` +
-      `attachments ${d.maxColorAttachments}, float32 ${d.float32}, float16 ${d.float16}`
+      `No usable render-target configuration at ${w}×${h}.\n\n` +
+      `Tried: ${rejected.join('; ')}\n\n` +
+      `GPU: ${d.vendor} / ${d.renderer}\n` +
+      `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
+      `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
+      `float32 ${d.float32}, float16 ${d.float16}, blendable ${d.floatBlend}\n\n` +
+      `At 64×64: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}\n\n` +
+      `Please report this text — it identifies exactly what the driver refused.`
     );
   }
 
@@ -317,8 +403,21 @@ export class SkullRenderer {
     });
     const rot = buildRotation(params.yaw, params.pitch, params.roll);
 
-    const band = Math.max(8, Math.min(bandRows, height));
-    this._ensureTargets(width, band);
+    // Some refusals are size-dependent rather than format-dependent, so if the
+    // whole ladder fails at this band height, halve it and let every
+    // configuration try again. Narrower bands mean more draw calls, not a worse
+    // picture.
+    let band = Math.max(8, Math.min(bandRows, height));
+    for (;;) {
+      try {
+        this._ensureTargets(width, band);
+        break;
+      } catch (err) {
+        if (band <= 8) throw err;
+        band = Math.max(8, band >> 1);
+        this.configIndex = this.startIndex;
+      }
+    }
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);

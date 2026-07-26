@@ -39,7 +39,7 @@ const browser = await chromium.launch({
 
 const results = [];
 let failures = 0;
-for (const index of [0, 1, 2, 3]) {
+for (const index of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
@@ -53,6 +53,7 @@ for (const index of [0, 1, 2, 3]) {
       page: 'a6', renderScale: 0.4, seed: 'target-compare',
     }));
     const cfg = await page.evaluate(() => window.__mm.targetConfig());
+    if (index === 0) console.log('  probe:', JSON.stringify(await page.evaluate(() => window.__mm.gpu().probeResult)));
     const svg = await page.evaluate(() => window.__mm.exportSvg());
     results.push({ index, cfg, strokes: info.stats.strokes, draw: info.stats.drawMm, svg });
     console.log(`  ${String(index)}  ${cfg.padEnd(24)} strokes=${String(info.stats.strokes).padStart(5)}` +

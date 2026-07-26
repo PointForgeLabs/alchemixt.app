@@ -289,7 +289,7 @@ async function boot() {
     exportGcode: () => toGcode(current.drawing, current.layers),
     plan: () => planPlate(state),
     targetConfig: () => (renderer.config ? renderer.config.id : 'none'),
-    gpu: () => renderer.debugInfo,
+    gpu: () => ({ ...renderer.debugInfo, probeResult: renderer.probe, configs: renderer.configs.map((c) => c.short) }),
     bounds: () => {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;
       for (const l of current.layers) {
