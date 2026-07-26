@@ -269,7 +269,10 @@ export async function composePlate({ renderer, params, onStage = () => {} }) {
       maxDots: Math.round(26000 * clamp(p.stippleWeight, 0, 1.4)),
       rng: rng.fork('stipple'), gamma: 1.15,
     });
-    stipplePaths.push(...dotsToStrokes(dots, Math.max(penPx * 0.7, 0.5), rng.fork('dots')));
+    // A dot is drawn as a very short stroke, so it has to be long enough to
+    // survive the minimum-stroke filter or the whole layer silently vanishes.
+    const dotLenPx = Math.max(penPx * 0.8, (p.minSegment + 0.06) * plan.dpmm);
+    stipplePaths.push(...dotsToStrokes(dots, dotLenPx, rng.fork('dots')));
   }
 
   /* ---- pixel space -> page millimetres -------------------------------- */
@@ -288,7 +291,10 @@ export async function composePlate({ renderer, params, onStage = () => {} }) {
   ];
 
   /* ---- ornament and lettering ----------------------------------------- */
-  const ornamentPaths = [...plan.framePaths];
+  // The frame is kept apart from the motifs: it is the one thing that must not
+  // be clipped to the picture area or hidden behind the skull.
+  const framePaths = [...plan.framePaths];
+  const motifPaths = [];
   const inner = plan.inner;
 
   // Where the skull actually ends on paper, measured rather than guessed: the
@@ -297,42 +303,52 @@ export async function composePlate({ renderer, params, onStage = () => {} }) {
   const skullBox = maskBoundsToPaper(fields, plan);
   const textTop = inner.y1 - plan.textBand * 1.15;
 
+  // Longest traced outline = the outer silhouette, in paper millimetres.
+  let skullRing = null;
+  if (silhouette.length) {
+    const longest = silhouette.reduce(
+      (best, q) => (polylineLength(q) > polylineLength(best) ? q : best), silhouette[0]);
+    if (longest.length >= 4) skullRing = toPaper([longest])[0];
+  }
+
   if (p.botanical !== 'none') {
-    // Springs from just above the lettering and rises into the gap under the
-    // jaw, sized so it can never reach either.
+    // Fits into the gap between the jaw and the lettering. An arrangement rises
+    // about 0.62 of its reach above the springing point, but the leaves on the
+    // lower side of each stem hang about 0.24 below it -- budget for both or the
+    // bottom row lands on top of the inscription.
     const gap = Math.max(8, textTop - skullBox.y1);
-    const reach = Math.min((inner.x1 - inner.x0) * 0.36, gap / 0.62);
-    ornamentPaths.push(...buildBotanical(p.botanical, {
+    const reach = Math.min((inner.x1 - inner.x0) * 0.36, gap / 0.86);
+    motifPaths.push(...buildBotanical(p.botanical, {
       cx: (skullBox.x0 + skullBox.x1) / 2,
-      cy: textTop - gap * 0.06,
+      cy: textTop - reach * 0.24,
       reach,
     }, rng.fork('bot')));
   }
   if (p.crossbones) {
-    ornamentPaths.push(...buildCrossbones(
-      (skullBox.x0 + skullBox.x1) / 2, skullBox.y1 - (skullBox.y1 - skullBox.y0) * 0.10,
-      (inner.x1 - inner.x0) * 0.66, rng.fork('bones')));
+    motifPaths.push(...buildCrossbones(
+      (skullBox.x0 + skullBox.x1) / 2, skullBox.y1 - (skullBox.y1 - skullBox.y0) * 0.13,
+      (inner.x1 - inner.x0) * 0.92, rng.fork('bones')));
   }
   if (p.wings) {
-    ornamentPaths.push(...buildWings(
-      (skullBox.x0 + skullBox.x1) / 2, skullBox.y0 + (skullBox.y1 - skullBox.y0) * 0.34,
+    motifPaths.push(...buildWings(
+      (skullBox.x0 + skullBox.x1) / 2, skullBox.y0 + (skullBox.y1 - skullBox.y0) * 0.26,
       (inner.x1 - inner.x0) * 0.99, rng.fork('wings')));
   }
   if (p.hourglass) {
     const hh = Math.min((skullBox.y1 - skullBox.y0) * 0.28, (inner.x1 - inner.x0) * 0.19);
-    ornamentPaths.push(...buildHourglass(
+    motifPaths.push(...buildHourglass(
       inner.x0 + hh * 0.62, Math.min(skullBox.y1, textTop - hh * 0.6), hh, rng));
   }
   if (p.rosette) {
     const r = Math.min(plan.artH, inner.x1 - inner.x0) * 0.055;
-    ornamentPaths.push(...buildRosette(
+    motifPaths.push(...buildRosette(
       (inner.x0 + inner.x1) / 2, Math.min(inner.y0 + r * 1.4, skullBox.y0 - r * 1.3), r));
   }
-  if (p.registration) ornamentPaths.push(...buildRegistration(plan.outer, 5));
+  if (p.registration) framePaths.push(...buildRegistration(plan.outer, 5));
 
   const textPaths = [];
   const inscription = resolvedInscription(p);
-  let baseline = inner.y1 - p.textSize * 0.55;
+  let baseline = inner.y1 - p.textSize * 0.9;
   const sub = (p.subscript || '').trim();
   if (sub) {
     const lay = layoutText(sub, { size: p.textSize * 0.62, tracking: p.textTracking * 1.4 });
@@ -368,12 +384,17 @@ export async function composePlate({ renderer, params, onStage = () => {} }) {
     const paths = finishArt(L.paths);
     if (paths.length) layers.push({ ...L, paths });
   }
-  if (ornamentPaths.length) {
-    let paths = ornamentPaths.map((q) => simplify(q, Math.min(p.simplifyTol, 0.06)));
-    paths = clipPathsToRing(paths, closeRing(rectRing(
-      plan.outer.x0 - 8, plan.outer.y0 - 8, plan.outer.x1 + 8, plan.outer.y1 + 8)), true);
-    paths = dropShort(chainPaths(paths, 0.05), 0.3);
-    layers.push({ id: 'ornament', name: 'Ornament', paths, tone: 'dark' });
+
+  // Motifs read as being *behind* the skull, so they are cut away wherever the
+  // silhouette covers them -- a wing or a crossbone drawn straight over the
+  // cranium looks pasted on.
+  let ornament = motifPaths.map((q) => simplify(q, Math.min(p.simplifyTol, 0.06)));
+  ornament = clipPathsToRing(ornament, innerRing, true);
+  if (skullRing) ornament = clipPathsToRing(ornament, skullRing, false);
+  ornament = ornament.concat(framePaths.map((q) => simplify(q, Math.min(p.simplifyTol, 0.06))));
+  ornament = dropShort(chainPaths(ornament, 0.05), 0.3);
+  if (ornament.length) {
+    layers.push({ id: 'ornament', name: 'Ornament', paths: ornament, tone: 'dark' });
   }
   if (textPaths.length) {
     layers.push({

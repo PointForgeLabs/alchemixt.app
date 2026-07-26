@@ -335,51 +335,84 @@ export function buildHourglass(cx, cy, h, rng) {
   return paths;
 }
 
+/**
+ * Two crossed long bones. Each condyle is drawn as the *outer* arc of its lobe
+ * only, so the knob sits on the shaft instead of being a full circle overlapping
+ * it -- and the lobes are barely wider than the shaft, which is what makes it
+ * read as a bone rather than a dumbbell.
+ */
 export function buildCrossbones(cx, cy, len, rng) {
   const paths = [];
   const bone = (angle) => {
     const ca = Math.cos(angle), sa = Math.sin(angle);
     const to = (u, v) => [cx + u * ca - v * sa, cy + u * sa + v * ca];
-    const half = len / 2, r = len * 0.055;
+    const r = len * 0.028;             // shaft half-width
+    const R = r * 1.35;                // condyle radius
+    const a = len / 2 - R;             // where the shaft meets the condyles
     const out = [];
-    // Shaft.
-    out.push([to(-half * 0.78, -r), to(half * 0.78, -r)]);
-    out.push([to(-half * 0.78, r), to(half * 0.78, r)]);
-    // Condyles: two lobes at each end.
-    for (const s of [-1, 1]) {
-      for (const v of [-1, 1]) {
-        const c = to(s * half * 0.82, v * r * 1.5);
-        out.push(ellipseRing(c[0], c[1], r * 2.0, r * 1.7, 26, angle));
+
+    // Shaft, stopping short of the knobs.
+    out.push([to(-(a - R * 0.2), -r), to(a - R * 0.2, -r)]);
+    out.push([to(-(a - R * 0.2), r), to(a - R * 0.2, r)]);
+
+    for (const end of [-1, 1]) {
+      for (const side of [-1, 1]) {
+        const cu = end * (a - R * 0.15);
+        const cv = side * r;
+        // Sweep the part of the lobe that lies outside the shaft.
+        const a0 = side < 0 ? 150 : -30;
+        const arc = [];
+        for (let i = 0; i <= 24; i++) {
+          const t = ((a0 + (i / 24) * 240) * Math.PI) / 180;
+          arc.push(to(cu + Math.cos(t) * R * (end > 0 ? 1 : -1), cv + Math.sin(t) * R));
+        }
+        out.push(arc);
       }
+      // The notch between the two condyles.
+      out.push([to(end * (a + R * 0.55), -r * 0.5), to(end * (a + R * 0.3), 0),
+                to(end * (a + R * 0.55), r * 0.5)]);
     }
     return out;
   };
-  for (const p of bone(0.42)) paths.push(p);
-  for (const p of bone(-0.42)) paths.push(p);
+  for (const p of bone(0.40)) paths.push(p);
+  for (const p of bone(-0.40)) paths.push(p);
   return paths;
 }
 
+/**
+ * A pair of spread wings, built the way a wing is actually shaped: a leading
+ * edge, then three ranks of feathers hanging off it -- short coverts, longer
+ * secondaries, long swept primaries. The feathers within a rank stay roughly
+ * parallel, sweeping from near-vertical at the shoulder to strongly raked at the
+ * tip. Angling each feather independently is what turns this into a thicket.
+ */
 export function buildWings(cx, cy, span, rng) {
   const paths = [];
+  const RANKS = [
+    { drop: 0.00, len0: 0.055, len1: 0.085, count: 10, wid: 0.20 },
+    { drop: 0.048, len0: 0.090, len1: 0.150, count: 9, wid: 0.17 },
+    { drop: 0.100, len0: 0.120, len1: 0.225, count: 8, wid: 0.15 },
+  ];
+
   for (const s of [-1, 1]) {
-    const root = [cx + s * span * 0.1, cy];
-    const tip = [cx + s * span * 0.5, cy - span * 0.1];
-    const spine = bezier(root, [cx + s * span * 0.25, cy - span * 0.16],
-                         [cx + s * span * 0.42, cy - span * 0.16], tip, 34);
-    paths.push(spine);
-    // Three rows of feathers, longest at the trailing edge.
-    for (let row = 0; row < 3; row++) {
-      const rowLen = span * (0.10 + row * 0.055);
-      const n = 9 - row;
-      for (let k = 0; k < n; k++) {
-        const t = 0.12 + (k / (n - 1)) * 0.86;
-        const i = Math.round(t * (spine.length - 1));
-        const [tx, ty] = tangentAt(spine, i);
-        const a = Math.atan2(ty, tx) + s * (1.15 - row * 0.12);
-        const L = rowLen * (0.55 + 0.7 * Math.sin(Math.PI * t) ** 0.6);
-        const bx = spine[i][0] + Math.cos(a) * rowLen * row * 0.55;
-        const by = spine[i][1] + Math.sin(a) * rowLen * row * 0.55;
-        paths.push(...leaf(bx, by, L, L * 0.16, a, false, 0.18 * s));
+    const root = [cx + s * span * 0.055, cy];
+    const tip = [cx + s * span * 0.5, cy - span * 0.135];
+    const lead = bezier(root,
+      [cx + s * span * 0.20, cy - span * 0.145],
+      [cx + s * span * 0.38, cy - span * 0.190], tip, 40);
+    paths.push(lead);
+
+    for (const rank of RANKS) {
+      for (let k = 0; k < rank.count; k++) {
+        const t = 0.10 + (k / (rank.count - 1)) * 0.88;
+        const i = Math.round(t * (lead.length - 1));
+        // Rake: near-vertical at the shoulder, swept back towards the tip.
+        const rake = (78 - 40 * t) * (Math.PI / 180);
+        const dirX = s * Math.cos(rake), dirY = Math.sin(rake);
+        const bx = lead[i][0] + dirX * span * rank.drop;
+        const by = lead[i][1] + dirY * span * rank.drop;
+        const L = span * (rank.len0 + (rank.len1 - rank.len0) * Math.sin(Math.PI * t * 0.75));
+        paths.push(...leaf(bx, by, L, L * rank.wid, Math.atan2(dirY, dirX), false, 0.12 * s));
       }
     }
   }

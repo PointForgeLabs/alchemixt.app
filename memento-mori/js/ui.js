@@ -42,8 +42,10 @@ export class Panel {
     label.textContent = c.label;
     if (c.hint) label.title = c.hint;
 
-    const value = document.createElement('span');
-    value.className = 'row-value';
+    // Only sliders get a numeric readout; a select or a checkbox already shows
+    // its own value, and the extra cell wraps their two-column grid.
+    const value = c.type === 'range' ? document.createElement('span') : null;
+    if (value) value.className = 'row-value';
 
     let input;
     if (c.type === 'range') {
@@ -52,7 +54,7 @@ export class Panel {
       input.min = c.min; input.max = c.max; input.step = c.step;
       input.addEventListener('input', () => {
         this.state[c.key] = parseFloat(input.value);
-        value.textContent = this._formatValue(c, this.state[c.key]);
+        if (value) value.textContent = this._formatValue(c, this.state[c.key]);
         this.onChange(c.key, { live: true });
       });
       input.addEventListener('change', () => this.onChange(c.key, { live: false }));
@@ -112,7 +114,8 @@ export class Panel {
     }
 
     input.id = `c-${c.key}`;
-    row.append(label, input, value);
+    if (value) row.append(label, input, value);
+    else row.append(label, input);
     this.rows.set(c.key, { row, input, value, control: c });
     return row;
   }

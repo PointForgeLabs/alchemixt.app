@@ -73,12 +73,17 @@ export function traceIsolines({
       const gy = (v01 - v00 + v11 - v10) * 0.5;
       const grad = Math.hypot(gx, gy);
       const spacing = grad > 1e-9 ? delta / grad : Infinity;
-      let parity = 1;
-      if (spacing < veryTight) parity = 4;
-      else if (spacing < tight) parity = 2;
 
       for (let k = k0; k <= k1; k++) {
-        if (parity > 1 && (k % parity + parity) % parity !== 0) continue;
+        // Each level gives up at a slightly different spacing. Using one shared
+        // threshold drops every other line along a dead-straight boundary, which
+        // reads as a machine artefact; scattering it lets the density thin out
+        // raggedly, the way a hand-cut plate does.
+        const h = Math.imul(k ^ 0x9e3779b9, 2654435761) >>> 0;
+        const wobble = 0.80 + 0.40 * (h / 4294967296);
+        const parity = spacing < veryTight * wobble ? 4
+                     : spacing < tight * wobble ? 2 : 1;
+        if (parity > 1 && ((k % parity) + parity) % parity !== 0) continue;
         const lv = phase + k * delta;
         // Corner codes, counter-clockwise from the top-left.
         const c = (v00 > lv ? 1 : 0) | (v10 > lv ? 2 : 0) | (v11 > lv ? 4 : 0) | (v01 > lv ? 8 : 0);

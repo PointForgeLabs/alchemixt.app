@@ -264,6 +264,7 @@ async function boot() {
 
   window.__mm = {
     ready: true,
+    hasPlate: () => !!current,
     state,
     async renderHeadless(overrides = {}) {
       Object.assign(state, overrides);
