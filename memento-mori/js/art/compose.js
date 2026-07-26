@@ -93,6 +93,27 @@ export function planPlate(params) {
   };
 }
 
+/**
+ * Fit a line of lettering into `maxW`, giving up tracking before size.
+ *
+ * Width is linear in both: w = size * (glyphSum/14 + tracking * gaps), so the
+ * needed tracking (and failing that, the needed size) can be solved directly.
+ * Without this a long custom inscription simply runs off the paper.
+ */
+function fitText(str, size, tracking, maxW) {
+  const gaps = Math.max(str.length - 1, 0);
+  const glyphs = measureText(str, { size: 14, tracking: 0 }) / 14;
+  if (glyphs <= 0 || maxW <= 0) return { size, tracking };
+  if (size * (glyphs + tracking * gaps) <= maxW) return { size, tracking };
+
+  const TRACK_FLOOR = 0.04;
+  if (gaps > 0) {
+    const needed = (maxW / size - glyphs) / gaps;
+    if (needed >= TRACK_FLOOR) return { size, tracking: needed };
+  }
+  return { size: maxW / (glyphs + TRACK_FLOOR * gaps), tracking: TRACK_FLOOR };
+}
+
 /** Paper-space bounds of the rendered silhouette. */
 function maskBoundsToPaper(fields, plan) {
   const { width: w, height: h, mask } = fields;
@@ -348,16 +369,19 @@ export async function composePlate({ renderer, params, onStage = () => {} }) {
 
   const textPaths = [];
   const inscription = resolvedInscription(p);
+  const textMaxW = (inner.x1 - inner.x0) * 0.96;
   let baseline = inner.y1 - p.textSize * 0.9;
   const sub = (p.subscript || '').trim();
   if (sub) {
-    const lay = layoutText(sub, { size: p.textSize * 0.62, tracking: p.textTracking * 1.4 });
+    const fit = fitText(sub, p.textSize * 0.62, p.textTracking * 1.4, textMaxW);
+    const lay = layoutText(sub, fit);
     const x = (inner.x0 + inner.x1) / 2 - lay.width / 2;
     for (const path of lay.paths) textPaths.push(path.map(([px, py]) => [x + px, baseline + py]));
     baseline -= p.textSize * 1.5;
   }
   if (inscription) {
-    const lay = layoutText(inscription, { size: p.textSize, tracking: p.textTracking });
+    const fit = fitText(inscription, p.textSize, p.textTracking, textMaxW);
+    const lay = layoutText(inscription, fit);
     const shaped = p.textArc
       ? arcText(lay, p.textArc, (inner.x1 - inner.x0) * 0.9 / Math.max(Math.abs(p.textArc), 0.08))
       : lay.paths;
@@ -397,9 +421,11 @@ export async function composePlate({ renderer, params, onStage = () => {} }) {
     layers.push({ id: 'ornament', name: 'Ornament', paths: ornament, tone: 'dark' });
   }
   if (textPaths.length) {
+    // Backstop: arc-shaped lettering can still swing wide of the picture area.
+    const clipped = clipPathsToRing(textPaths, innerRing, true);
     layers.push({
       id: 'lettering', name: 'Lettering',
-      paths: dropShort(chainPaths(textPaths, 0.04), 0.2), tone: 'dark',
+      paths: dropShort(chainPaths(clipped, 0.04), 0.2), tone: 'dark',
     });
   }
 

@@ -279,6 +279,24 @@ async function boot() {
     exportSvg: () => exportSvgText(),
     exportGcode: () => toGcode(current.drawing, current.layers),
     plan: () => planPlate(state),
+    bounds: () => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;
+      for (const l of current.layers) {
+        for (const path of l.paths) {
+          for (const [x, y] of path) {
+            count++;
+            if (x < x0) x0 = x;
+            if (y < y0) y0 = y;
+            if (x > x1) x1 = x;
+            if (y > y1) y1 = y;
+          }
+        }
+      }
+      return {
+        count, x0, y0, x1, y1,
+        pageW: current.drawing.widthMm, pageH: current.drawing.heightMm,
+      };
+    },
     setMode: (m) => preview.setMode(m),
     layerCounts: () => current.layers.map((l) => [l.name, l.paths.length]),
   };
