@@ -6,14 +6,29 @@ image derived entirely from that reading — then tells you why it looks the way
 No API keys. No image models. No cost per render. Every mark on the canvas is
 computed from the text.
 
+## Just open it
+
+**[`interpretive-art-machine.html`](interpretive-art-machine.html)** — one
+self-contained file. Double-click it, or drag it into a browser tab. Nothing to
+install, no server, no build step. It works offline apart from the lyric lookup,
+which needs a connection like anything else that fetches from the internet.
+
+That file is generated from `src/`, so the two can't drift apart:
+
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # static bundle in dist/
+npm run standalone   # regenerates interpretive-art-machine.html
 ```
 
-The build is a plain static site with no runtime dependencies (~49 KB, 19 KB gzipped).
-Drop `dist/` on any static host.
+### Or run it as a project
+
+```bash
+npm run dev      # http://localhost:5173, hot reload
+npm run build    # static bundle in dist/ (~49 KB, 19 KB gzipped)
+```
+
+Use this if you want to edit the lexicons or add a visual system. `dist/` drops
+onto any static host.
 
 ---
 
@@ -126,6 +141,10 @@ Driven in headless Chromium against the production build:
 - "New variation" produces a genuinely different image
 - malformed URLs fail with a useful message rather than an exception
 - typecheck clean under `strict` plus `noUncheckedIndexedAccess`
+
+The standalone single-file build was verified separately over `file://` — all
+seven systems render identically, determinism holds, and PNG export produces a
+full-resolution file.
 
 **Not verified from the build sandbox:** live calls to YouTube oEmbed, LRCLIB,
 and lyrics.ovh — outbound requests to those hosts are blocked here, so the

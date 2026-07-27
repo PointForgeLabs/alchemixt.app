@@ -1,0 +1,3742 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interpretive Art Machine</title>
+    <!-- Self-contained build. Open directly in a browser; nothing to install. -->
+    <meta
+      name="description"
+      content="Link a song. The machine reads its lyrics and themes, then paints what it finds."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+/* ============================================================
+   Interpretive Art Machine — interface
+   Gallery-dark, so the canvas is the brightest thing on screen.
+   ============================================================ */
+
+:root {
+  --ink: #f2efe9;
+  --ink-dim: #a9a49c;
+  --ink-faint: #6f6a63;
+  --ground: #0c0c0e;
+  --panel: #141416;
+  --panel-raised: #1b1b1f;
+  --line: #2a2a30;
+  --accent: #d8874a;
+  --accent-soft: rgba(216, 135, 74, 0.16);
+
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --serif: 'Fraunces', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius: 4px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  max-width: 1560px;
+  margin: 0 auto;
+  padding: 32px 28px 64px;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 22px;
+  margin-bottom: 28px;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.wordmark-glyph {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #d8874a, #6c4fa3, #2f7f96, #d8874a);
+  filter: saturate(0.85);
+}
+
+.masthead h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(22px, 3vw, 30px);
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--ink-dim);
+  font-size: 14px;
+}
+
+/* ---------- layout ---------- */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 460px) minmax(0, 1fr);
+  gap: 34px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  /* On narrow screens the picture should come first — it's the point. */
+  .gallery {
+    order: -1;
+  }
+}
+
+/* ---------- intake ---------- */
+
+.field-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 8px;
+}
+
+.intake-row {
+  display: flex;
+  gap: 8px;
+}
+
+input[type='text'],
+textarea,
+select {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 11px 13px;
+  transition: border-color 0.15s ease;
+}
+
+input[type='text']:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+textarea {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+button {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 11px 17px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+button.primary {
+  background: var(--accent);
+  color: #1a0f06;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #e39a60;
+}
+
+button.secondary {
+  background: var(--panel-raised);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+button.secondary:hover:not(:disabled) {
+  border-color: var(--ink-faint);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.status {
+  min-height: 20px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.status.error {
+  color: #e08a7a;
+}
+
+.status.working::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.1s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* ---------- fallback paste ---------- */
+
+.fallback {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--panel);
+}
+
+.fallback[open] {
+  padding-bottom: 14px;
+}
+
+.fallback summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-dim);
+  list-style: none;
+}
+
+.fallback summary::-webkit-details-marker {
+  display: none;
+}
+
+.fallback summary::before {
+  content: '+ ';
+  color: var(--accent);
+}
+
+.fallback[open] summary::before {
+  content: '− ';
+}
+
+.fallback-note {
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  margin: 12px 0 10px;
+}
+
+/* ---------- reading ---------- */
+
+.reading {
+  margin-top: 26px;
+  animation: rise 0.4s ease both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.now-reading {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+  border-left: 2px solid var(--accent);
+  padding-left: 11px;
+  margin-bottom: 16px;
+}
+
+.now-reading strong {
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+
+.verdict {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(19px, 2.4vw, 25px);
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  margin: 0 0 20px;
+}
+
+.system-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 24px;
+}
+
+.system-eyebrow {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.system-name {
+  display: block;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 400;
+  margin: 3px 0 6px;
+}
+
+.system-description {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+
+.reading-block {
+  margin-bottom: 26px;
+}
+
+.reading-block h3 {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.notes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notes li {
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  line-height: 1.62;
+  padding-left: 16px;
+  margin-bottom: 11px;
+  position: relative;
+}
+
+.notes li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 9px;
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  opacity: 0.65;
+}
+
+/* ---------- theme bars ---------- */
+
+.themes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.theme-row {
+  margin-bottom: 12px;
+}
+
+.theme-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.theme-name {
+  color: var(--ink);
+}
+
+.theme-value {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.theme-track {
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.theme-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.theme-row.is-secondary .theme-fill {
+  background: var(--ink-faint);
+}
+
+.theme-hits {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  margin-top: 5px;
+  word-spacing: 2px;
+}
+
+/* ---------- metrics ---------- */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+.metric dt {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.metric dd {
+  margin: 3px 0 0;
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.metric dd span {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: 4px;
+}
+
+/* ---------- signature words ---------- */
+
+.signature {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+}
+
+.signature li {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(216, 135, 74, 0.28);
+  border-radius: 999px;
+  padding: 3px 11px;
+  color: var(--ink);
+}
+
+.signature li b {
+  color: var(--accent);
+  font-weight: 500;
+  margin-left: 5px;
+}
+
+/* ---------- gallery ---------- */
+
+.gallery {
+  position: sticky;
+  top: 28px;
+}
+
+@media (max-width: 980px) {
+  .gallery {
+    position: static;
+  }
+}
+
+.frame {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+}
+
+#canvas {
+  display: block;
+  max-width: 100%;
+  /* Cap by viewport height so tall formats don't run off the screen. */
+  max-height: min(74vh, 900px);
+  width: auto;
+  height: auto;
+  border-radius: 2px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+#canvas.is-visible {
+  opacity: 1;
+}
+
+/* `display: flex` would otherwise beat the [hidden] attribute's display:none,
+   leaving the placeholder painted over finished artwork. */
+.frame-empty[hidden] {
+  display: none;
+}
+
+.frame-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--ink-faint);
+  text-align: center;
+  pointer-events: none;
+}
+
+.frame-empty p {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 17px;
+}
+
+.frame-empty-sub {
+  font-family: var(--sans) !important;
+  font-size: 13px !important;
+  color: #504b45;
+}
+
+.progress {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.16s linear;
+}
+
+.gallery-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.select-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.select-field select {
+  width: auto;
+  padding: 9px 11px;
+  font-size: 13px;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.plate {
+  margin: 14px 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  line-height: 1.7;
+  min-height: 18px;
+}
+
+.plate strong {
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+
+/* ---------- colophon ---------- */
+
+.colophon {
+  margin-top: 56px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.colophon p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+  max-width: 74ch;
+  line-height: 1.65;
+}
+
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="masthead">
+        <div class="wordmark">
+          <span class="wordmark-glyph" aria-hidden="true"></span>
+          <div>
+            <h1>Interpretive Art Machine</h1>
+            <p class="tagline">Link a song. It reads the words, then paints what it found.</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <!-- ============ LEFT: input + reading ============ -->
+        <section class="console" aria-label="Controls and interpretation">
+          <form class="intake" id="intake-form" autocomplete="off">
+            <label class="field-label" for="url-input">YouTube link</label>
+            <div class="intake-row">
+              <input
+                id="url-input"
+                name="url"
+                type="text"
+                inputmode="url"
+                placeholder="https://www.youtube.com/watch?v=…"
+                spellcheck="false"
+              />
+              <button type="submit" class="primary" id="interpret-button">Interpret</button>
+            </div>
+            <p class="status" id="status" role="status" aria-live="polite"></p>
+          </form>
+
+          <!-- Revealed when auto-fetch can't find the words -->
+          <details class="fallback" id="fallback">
+            <summary>Paste lyrics instead</summary>
+            <p class="fallback-note">
+              The machine reads the words in memory to measure them. It never displays them back or
+              includes them in the artwork — only the interpretation it derives.
+            </p>
+            <textarea
+              id="lyrics-input"
+              rows="8"
+              placeholder="Paste the lyrics here…"
+              spellcheck="false"
+            ></textarea>
+            <button type="button" class="secondary" id="read-pasted">Read these words</button>
+          </details>
+
+          <!-- The machine's written interpretation -->
+          <article class="reading" id="reading" hidden>
+            <div class="now-reading" id="now-reading"></div>
+
+            <h2 class="verdict" id="verdict"></h2>
+
+            <div class="system-card">
+              <span class="system-eyebrow">Visual system</span>
+              <strong class="system-name" id="system-name"></strong>
+              <p class="system-description" id="system-description"></p>
+            </div>
+
+            <section class="reading-block">
+              <h3>Why it looks like this</h3>
+              <ul class="notes" id="notes"></ul>
+            </section>
+
+            <section class="reading-block">
+              <h3>Thematic fields</h3>
+              <ul class="themes" id="themes"></ul>
+            </section>
+
+            <section class="reading-block">
+              <h3>Measurements</h3>
+              <dl class="metrics" id="metrics"></dl>
+            </section>
+
+            <section class="reading-block">
+              <h3>Signature words</h3>
+              <ul class="signature" id="signature"></ul>
+            </section>
+          </article>
+        </section>
+
+        <!-- ============ RIGHT: the canvas ============ -->
+        <section class="gallery" aria-label="Generated artwork">
+          <div class="frame" id="frame">
+            <canvas id="canvas" width="1400" height="1750" role="img" aria-label="Generated interpretive artwork"></canvas>
+            <div class="frame-empty" id="frame-empty">
+              <p>Nothing read yet.</p>
+              <p class="frame-empty-sub">Paste a song link and the canvas will fill.</p>
+            </div>
+            <div class="progress" id="progress" hidden><span id="progress-bar"></span></div>
+          </div>
+
+          <div class="gallery-controls">
+            <button type="button" class="secondary" id="revariate" disabled>New variation</button>
+            <label class="select-field">
+              <span>Format</span>
+              <select id="format">
+                <option value="portrait">Portrait · 4:5</option>
+                <option value="square">Square · 1:1</option>
+                <option value="landscape">Landscape · 3:2</option>
+                <option value="poster">Poster · 2:3</option>
+              </select>
+            </label>
+            <button type="button" class="secondary" id="download" disabled>Download PNG</button>
+          </div>
+          <p class="plate" id="plate"></p>
+        </section>
+      </main>
+
+      <footer class="colophon">
+        <p>
+          Every mark is generated from the text — same song, same artwork, every time. Lyrics are
+          fetched from public databases, held in memory for analysis only, and never stored or
+          reproduced.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+(() => {
+  // src/analysis/tokenize.ts
+  var SECTION_RE = /^\s*[\[({]\s*([^\])}]{1,40}?)\s*[\])}]\s*$/;
+  var NOISE_RE = /^\s*(\d+\s*(embed|contributors?)|you might also like|see .+ live|get tickets.*)\s*$/i;
+  function normalizeApostrophes(input) {
+    return input.replace(/[‘’ʼ′]/g, "'").replace(/[“”]/g, '"');
+  }
+  function words(text) {
+    return normalizeApostrophes(text).toLowerCase().split(/[^a-z']+/).map((w) => w.replace(/'/g, "")).filter((w) => w.length > 0);
+  }
+  function tokenize(raw) {
+    const lines = [];
+    const sections = [];
+    let currentSection = null;
+    for (const rawLine of normalizeApostrophes(raw).split(/\r?\n/)) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+      if (NOISE_RE.test(trimmed)) continue;
+      const marker = SECTION_RE.exec(trimmed);
+      if (marker?.[1]) {
+        currentSection = marker[1].toLowerCase();
+        sections.push(currentSection);
+        continue;
+      }
+      const w = words(trimmed);
+      if (w.length === 0) continue;
+      lines.push({ text: trimmed.toLowerCase(), words: w, section: currentSection });
+    }
+    const allWords = lines.flatMap((l) => l.words);
+    const counts = /* @__PURE__ */ new Map();
+    for (const w of allWords) counts.set(w, (counts.get(w) ?? 0) + 1);
+    return { lines, words: allWords, counts, sections };
+  }
+
+  // src/analysis/lexicons.ts
+  var VALENCE = {
+    // warm
+    love: 0.8,
+    loved: 0.8,
+    loving: 0.8,
+    adore: 0.9,
+    joy: 0.95,
+    joyful: 0.95,
+    happy: 0.8,
+    happiness: 0.85,
+    smile: 0.6,
+    smiling: 0.6,
+    laugh: 0.7,
+    laughing: 0.7,
+    bright: 0.6,
+    brighter: 0.6,
+    warm: 0.6,
+    warmth: 0.65,
+    gold: 0.5,
+    golden: 0.6,
+    beautiful: 0.8,
+    beauty: 0.75,
+    sweet: 0.6,
+    sweetest: 0.7,
+    tender: 0.6,
+    hope: 0.75,
+    hopeful: 0.8,
+    dream: 0.4,
+    dreams: 0.4,
+    dreaming: 0.4,
+    free: 0.7,
+    freedom: 0.8,
+    alive: 0.7,
+    heal: 0.7,
+    healing: 0.75,
+    whole: 0.6,
+    home: 0.5,
+    safe: 0.6,
+    peace: 0.8,
+    peaceful: 0.8,
+    calm: 0.6,
+    easy: 0.4,
+    shine: 0.65,
+    shining: 0.65,
+    glow: 0.6,
+    glowing: 0.6,
+    rise: 0.5,
+    rising: 0.5,
+    bless: 0.7,
+    blessed: 0.75,
+    grace: 0.7,
+    faith: 0.6,
+    believe: 0.55,
+    trust: 0.6,
+    friend: 0.55,
+    together: 0.65,
+    forever: 0.35,
+    always: 0.3,
+    yes: 0.4,
+    celebrate: 0.85,
+    dance: 0.6,
+    dancing: 0.6,
+    sing: 0.6,
+    singing: 0.6,
+    song: 0.35,
+    good: 0.5,
+    better: 0.5,
+    best: 0.6,
+    perfect: 0.7,
+    heaven: 0.7,
+    angel: 0.65,
+    gentle: 0.55,
+    soft: 0.4,
+    kiss: 0.6,
+    kissing: 0.6,
+    touch: 0.35,
+    hold: 0.35,
+    new: 0.3,
+    young: 0.35,
+    sun: 0.5,
+    sunshine: 0.75,
+    summer: 0.5,
+    bloom: 0.65,
+    // cold
+    hate: -0.85,
+    hated: -0.85,
+    hurt: -0.7,
+    hurts: -0.7,
+    hurting: -0.7,
+    pain: -0.8,
+    painful: -0.8,
+    ache: -0.65,
+    aching: -0.65,
+    wound: -0.7,
+    wounded: -0.75,
+    sad: -0.6,
+    sadness: -0.65,
+    sorrow: -0.8,
+    grief: -0.9,
+    grieve: -0.85,
+    mourn: -0.85,
+    cry: -0.65,
+    crying: -0.65,
+    cried: -0.65,
+    tears: -0.7,
+    weep: -0.75,
+    weeping: -0.75,
+    broke: -0.6,
+    broken: -0.75,
+    break: -0.5,
+    breaking: -0.6,
+    shatter: -0.8,
+    shattered: -0.85,
+    lost: -0.7,
+    lose: -0.6,
+    losing: -0.65,
+    loss: -0.75,
+    gone: -0.6,
+    leave: -0.4,
+    left: -0.4,
+    leaving: -0.55,
+    goodbye: -0.6,
+    farewell: -0.55,
+    end: -0.4,
+    ending: -0.45,
+    alone: -0.7,
+    lonely: -0.8,
+    loneliness: -0.85,
+    empty: -0.75,
+    emptiness: -0.8,
+    cold: -0.5,
+    colder: -0.55,
+    dark: -0.5,
+    darkness: -0.6,
+    black: -0.35,
+    grey: -0.35,
+    gray: -0.35,
+    fear: -0.7,
+    afraid: -0.7,
+    scared: -0.65,
+    terror: -0.85,
+    dread: -0.8,
+    die: -0.8,
+    dying: -0.85,
+    died: -0.8,
+    dead: -0.8,
+    death: -0.85,
+    grave: -0.7,
+    buried: -0.65,
+    kill: -0.8,
+    blood: -0.55,
+    bleed: -0.65,
+    bleeding: -0.65,
+    scar: -0.6,
+    scars: -0.6,
+    fall: -0.35,
+    falling: -0.4,
+    fell: -0.35,
+    drown: -0.75,
+    drowning: -0.8,
+    sink: -0.6,
+    sinking: -0.65,
+    hell: -0.7,
+    devil: -0.6,
+    sin: -0.5,
+    guilt: -0.7,
+    shame: -0.75,
+    blame: -0.6,
+    lie: -0.6,
+    lies: -0.6,
+    lied: -0.6,
+    liar: -0.7,
+    betray: -0.85,
+    betrayed: -0.85,
+    fake: -0.55,
+    false: -0.5,
+    wrong: -0.5,
+    bad: -0.5,
+    worse: -0.6,
+    worst: -0.7,
+    tired: -0.5,
+    exhausted: -0.6,
+    weary: -0.6,
+    numb: -0.65,
+    hollow: -0.7,
+    nothing: -0.55,
+    never: -0.4,
+    nobody: -0.6,
+    no: -0.3,
+    without: -0.4,
+    war: -0.7,
+    fight: -0.4,
+    fighting: -0.45,
+    angry: -0.65,
+    anger: -0.7,
+    rage: -0.8,
+    ghost: -0.5,
+    haunt: -0.65,
+    haunted: -0.7,
+    silence: -0.35,
+    silent: -0.3,
+    rain: -0.2,
+    storm: -0.35,
+    winter: -0.3,
+    ruin: -0.75,
+    ruined: -0.8,
+    waste: -0.6
+  };
+  var AROUSAL = {
+    scream: 1,
+    screaming: 1,
+    shout: 0.9,
+    shouting: 0.9,
+    yell: 0.9,
+    roar: 0.95,
+    explode: 1,
+    explosion: 1,
+    burst: 0.9,
+    blast: 0.9,
+    crash: 0.9,
+    crashing: 0.9,
+    smash: 0.95,
+    shatter: 0.9,
+    shattered: 0.85,
+    tear: 0.8,
+    tearing: 0.85,
+    rip: 0.85,
+    burn: 0.85,
+    burning: 0.85,
+    fire: 0.8,
+    flame: 0.75,
+    flames: 0.8,
+    blaze: 0.9,
+    inferno: 0.95,
+    run: 0.75,
+    running: 0.8,
+    race: 0.8,
+    chase: 0.8,
+    chasing: 0.8,
+    escape: 0.75,
+    fight: 0.85,
+    fighting: 0.85,
+    war: 0.8,
+    battle: 0.85,
+    strike: 0.85,
+    hit: 0.8,
+    rage: 0.95,
+    fury: 0.95,
+    wild: 0.8,
+    wilder: 0.8,
+    crazy: 0.8,
+    mad: 0.75,
+    insane: 0.85,
+    dance: 0.7,
+    dancing: 0.75,
+    jump: 0.75,
+    dive: 0.7,
+    fly: 0.65,
+    flying: 0.7,
+    storm: 0.8,
+    thunder: 0.85,
+    lightning: 0.9,
+    hurricane: 0.95,
+    quake: 0.9,
+    pound: 0.85,
+    pounding: 0.85,
+    beat: 0.6,
+    beating: 0.65,
+    pulse: 0.6,
+    heartbeat: 0.6,
+    loud: 0.8,
+    louder: 0.85,
+    noise: 0.7,
+    alarm: 0.8,
+    siren: 0.85,
+    rush: 0.8,
+    rushing: 0.8,
+    speed: 0.8,
+    fast: 0.75,
+    faster: 0.85,
+    drive: 0.65,
+    driving: 0.7,
+    shake: 0.75,
+    shaking: 0.75,
+    tremble: 0.6,
+    shiver: 0.5,
+    rise: 0.55,
+    climb: 0.6,
+    higher: 0.6,
+    up: 0.45,
+    // stillness
+    still: 0.05,
+    quiet: 0.08,
+    quietly: 0.08,
+    silence: 0.05,
+    silent: 0.05,
+    hush: 0.05,
+    sleep: 0.05,
+    sleeping: 0.05,
+    asleep: 0.05,
+    dream: 0.15,
+    dreaming: 0.15,
+    drift: 0.15,
+    slow: 0.15,
+    slowly: 0.15,
+    soft: 0.15,
+    softly: 0.15,
+    gentle: 0.2,
+    gently: 0.2,
+    whisper: 0.15,
+    whispering: 0.15,
+    breathe: 0.25,
+    breathing: 0.25,
+    sigh: 0.2,
+    wait: 0.15,
+    waiting: 0.15,
+    stay: 0.2,
+    rest: 0.1,
+    resting: 0.1,
+    calm: 0.1,
+    float: 0.2,
+    floating: 0.2,
+    hover: 0.2,
+    linger: 0.15,
+    lying: 0.1,
+    sit: 0.1,
+    sitting: 0.1,
+    frozen: 0.1,
+    freeze: 0.15,
+    stopped: 0.05,
+    motionless: 0,
+    sink: 0.25,
+    sinking: 0.3
+  };
+  var THEMES = [
+    {
+      key: "love",
+      label: "Love & Longing",
+      gloss: "pulls forms toward a center and warms the palette",
+      words: [
+        "love",
+        "loves",
+        "loved",
+        "loving",
+        "lover",
+        "heart",
+        "hearts",
+        "kiss",
+        "kissed",
+        "touch",
+        "hold",
+        "holding",
+        "held",
+        "want",
+        "wanted",
+        "need",
+        "needed",
+        "desire",
+        "yours",
+        "mine",
+        "baby",
+        "darling",
+        "honey",
+        "sweetheart",
+        "romance",
+        "together",
+        "embrace",
+        "arms",
+        "close",
+        "closer",
+        "crave",
+        "longing",
+        "yearn",
+        "miss",
+        "missing",
+        "adore",
+        "devotion",
+        "forever",
+        "promise",
+        "vow",
+        "marry",
+        "bride",
+        "ring"
+      ]
+    },
+    {
+      key: "loss",
+      label: "Loss & Grief",
+      gloss: "thins the light and lets the composition fall apart at the edges",
+      words: [
+        "lost",
+        "lose",
+        "losing",
+        "loss",
+        "gone",
+        "goodbye",
+        "farewell",
+        "left",
+        "leaving",
+        "grief",
+        "grieve",
+        "mourn",
+        "mourning",
+        "sorrow",
+        "tears",
+        "cry",
+        "crying",
+        "weep",
+        "miss",
+        "missed",
+        "empty",
+        "emptiness",
+        "hollow",
+        "alone",
+        "lonely",
+        "loneliness",
+        "broken",
+        "shattered",
+        "ache",
+        "aching",
+        "wound",
+        "scar",
+        "scars",
+        "grave",
+        "buried",
+        "die",
+        "died",
+        "dying",
+        "dead",
+        "death",
+        "funeral",
+        "ghost",
+        "ghosts",
+        "absence",
+        "without",
+        "never",
+        "nothing",
+        "nobody",
+        "over",
+        "ended",
+        "ending",
+        "goodnight"
+      ]
+    },
+    {
+      key: "defiance",
+      label: "Defiance & Anger",
+      gloss: "fractures the surface and drives hard diagonals through it",
+      words: [
+        "fight",
+        "fighting",
+        "fought",
+        "war",
+        "battle",
+        "enemy",
+        "rebel",
+        "revolt",
+        "riot",
+        "anger",
+        "angry",
+        "rage",
+        "fury",
+        "furious",
+        "hate",
+        "hated",
+        "scream",
+        "screaming",
+        "shout",
+        "yell",
+        "roar",
+        "burn",
+        "burning",
+        "destroy",
+        "break",
+        "breaking",
+        "smash",
+        "refuse",
+        "resist",
+        "stand",
+        "against",
+        "never",
+        "won",
+        "win",
+        "fist",
+        "blood",
+        "revenge",
+        "betray",
+        "betrayed",
+        "liar",
+        "lies",
+        "blame",
+        "guilty",
+        "chains",
+        "cage",
+        "free",
+        "freedom",
+        "escape",
+        "run",
+        "survive",
+        "stronger",
+        "rise",
+        "fallen"
+      ]
+    },
+    {
+      key: "transcendence",
+      label: "Transcendence & Faith",
+      gloss: "organizes everything around a radiant center",
+      words: [
+        "god",
+        "lord",
+        "heaven",
+        "holy",
+        "sacred",
+        "divine",
+        "angel",
+        "angels",
+        "soul",
+        "spirit",
+        "prayer",
+        "pray",
+        "praying",
+        "faith",
+        "believe",
+        "grace",
+        "bless",
+        "blessed",
+        "saved",
+        "salvation",
+        "sin",
+        "sinner",
+        "forgive",
+        "forgiven",
+        "redemption",
+        "gospel",
+        "eternal",
+        "eternity",
+        "infinite",
+        "universe",
+        "cosmos",
+        "star",
+        "stars",
+        "light",
+        "rise",
+        "risen",
+        "above",
+        "higher",
+        "beyond",
+        "transcend",
+        "awake",
+        "awakening",
+        "truth",
+        "meaning",
+        "purpose",
+        "destiny",
+        "fate",
+        "miracle",
+        "wonder",
+        "glory"
+      ]
+    },
+    {
+      key: "nature",
+      label: "Earth & Growing Things",
+      gloss: "softens every edge into organic growth",
+      words: [
+        "tree",
+        "trees",
+        "forest",
+        "wood",
+        "woods",
+        "leaf",
+        "leaves",
+        "branch",
+        "root",
+        "roots",
+        "flower",
+        "flowers",
+        "bloom",
+        "blossom",
+        "garden",
+        "grass",
+        "field",
+        "fields",
+        "meadow",
+        "mountain",
+        "mountains",
+        "hill",
+        "hills",
+        "valley",
+        "stone",
+        "stones",
+        "rock",
+        "earth",
+        "ground",
+        "soil",
+        "dirt",
+        "dust",
+        "seed",
+        "grow",
+        "growing",
+        "green",
+        "wild",
+        "bird",
+        "birds",
+        "wing",
+        "wings",
+        "crow",
+        "dove",
+        "wolf",
+        "horse",
+        "animal",
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "harvest",
+        "season",
+        "sky",
+        "wind",
+        "air"
+      ]
+    },
+    {
+      key: "night",
+      label: "Night & Dream",
+      gloss: "drops the value range and scatters points of light across the dark",
+      words: [
+        "night",
+        "nights",
+        "midnight",
+        "dark",
+        "darkness",
+        "shadow",
+        "shadows",
+        "moon",
+        "moonlight",
+        "star",
+        "stars",
+        "starlight",
+        "sleep",
+        "asleep",
+        "dream",
+        "dreams",
+        "dreaming",
+        "nightmare",
+        "wake",
+        "awake",
+        "insomnia",
+        "late",
+        "evening",
+        "dusk",
+        "twilight",
+        "black",
+        "blind",
+        "unseen",
+        "hidden",
+        "secret",
+        "quiet",
+        "silence",
+        "ghost",
+        "haunt",
+        "haunted",
+        "drift",
+        "floating",
+        "lucid",
+        "vision",
+        "illusion"
+      ]
+    },
+    {
+      key: "motion",
+      label: "Motion & Escape",
+      gloss: "lays down long directional currents the whole picture travels along",
+      words: [
+        "road",
+        "roads",
+        "highway",
+        "street",
+        "streets",
+        "drive",
+        "driving",
+        "drove",
+        "car",
+        "train",
+        "plane",
+        "bus",
+        "wheels",
+        "engine",
+        "travel",
+        "journey",
+        "miles",
+        "distance",
+        "run",
+        "running",
+        "ran",
+        "walk",
+        "walking",
+        "go",
+        "going",
+        "gone",
+        "leave",
+        "leaving",
+        "escape",
+        "chase",
+        "chasing",
+        "follow",
+        "away",
+        "far",
+        "further",
+        "forward",
+        "ahead",
+        "wander",
+        "wandering",
+        "roam",
+        "drift",
+        "drifting",
+        "move",
+        "moving",
+        "flee",
+        "fly",
+        "return",
+        "coming",
+        "back",
+        "north",
+        "south",
+        "east",
+        "west",
+        "border",
+        "horizon"
+      ]
+    },
+    {
+      key: "body",
+      label: "Body & Appetite",
+      gloss: "thickens the marks and brings them close to the picture plane",
+      words: [
+        "body",
+        "skin",
+        "bone",
+        "bones",
+        "blood",
+        "flesh",
+        "hand",
+        "hands",
+        "finger",
+        "fingers",
+        "mouth",
+        "lips",
+        "tongue",
+        "teeth",
+        "eyes",
+        "eye",
+        "hair",
+        "face",
+        "neck",
+        "back",
+        "hips",
+        "legs",
+        "feet",
+        "breath",
+        "breathe",
+        "breathing",
+        "sweat",
+        "pulse",
+        "heartbeat",
+        "hunger",
+        "hungry",
+        "thirst",
+        "taste",
+        "tasting",
+        "smell",
+        "feel",
+        "feeling",
+        "felt",
+        "hot",
+        "heat",
+        "fever",
+        "shiver",
+        "tremble",
+        "naked",
+        "bed",
+        "sheets",
+        "skin"
+      ]
+    },
+    {
+      key: "memory",
+      label: "Memory & Time",
+      gloss: "stacks the image into strata, like sediment or old photographs",
+      words: [
+        "remember",
+        "remembered",
+        "memory",
+        "memories",
+        "forget",
+        "forgot",
+        "forgotten",
+        "past",
+        "used",
+        "once",
+        "before",
+        "ago",
+        "yesterday",
+        "childhood",
+        "young",
+        "younger",
+        "old",
+        "older",
+        "time",
+        "times",
+        "year",
+        "years",
+        "day",
+        "days",
+        "summer",
+        "photograph",
+        "picture",
+        "letter",
+        "letters",
+        "name",
+        "names",
+        "story",
+        "told",
+        "said",
+        "was",
+        "were",
+        "nostalgia",
+        "return",
+        "again",
+        "still",
+        "always",
+        "never",
+        "ancient",
+        "history",
+        "trace"
+      ]
+    },
+    {
+      key: "city",
+      label: "City & Machine",
+      gloss: "imposes a rigid lattice the organic forms have to negotiate",
+      words: [
+        "city",
+        "cities",
+        "town",
+        "downtown",
+        "street",
+        "streets",
+        "building",
+        "buildings",
+        "concrete",
+        "steel",
+        "glass",
+        "window",
+        "windows",
+        "door",
+        "doors",
+        "wall",
+        "walls",
+        "room",
+        "rooms",
+        "apartment",
+        "floor",
+        "stairs",
+        "roof",
+        "bridge",
+        "tunnel",
+        "subway",
+        "neon",
+        "sign",
+        "signs",
+        "light",
+        "lights",
+        "traffic",
+        "crowd",
+        "crowds",
+        "people",
+        "machine",
+        "machines",
+        "wire",
+        "wires",
+        "phone",
+        "screen",
+        "television",
+        "radio",
+        "money",
+        "work",
+        "job",
+        "factory",
+        "smoke",
+        "noise",
+        "siren",
+        "electric",
+        "current"
+      ]
+    },
+    {
+      key: "water",
+      label: "Water",
+      gloss: "makes everything flow, pool, and reflect",
+      words: [
+        "water",
+        "waters",
+        "sea",
+        "ocean",
+        "wave",
+        "waves",
+        "tide",
+        "tides",
+        "river",
+        "rivers",
+        "stream",
+        "creek",
+        "lake",
+        "pond",
+        "rain",
+        "raining",
+        "storm",
+        "flood",
+        "flooded",
+        "drown",
+        "drowning",
+        "swim",
+        "swimming",
+        "sink",
+        "sinking",
+        "deep",
+        "deeper",
+        "depth",
+        "shore",
+        "beach",
+        "sand",
+        "coast",
+        "harbor",
+        "boat",
+        "ship",
+        "sail",
+        "sailing",
+        "anchor",
+        "blue",
+        "wet",
+        "salt",
+        "tears",
+        "pour",
+        "pouring",
+        "flow",
+        "flowing",
+        "current",
+        "ice"
+      ]
+    },
+    {
+      key: "fire",
+      label: "Fire & Light",
+      gloss: "pushes hot color outward from bright cores",
+      words: [
+        "fire",
+        "fires",
+        "flame",
+        "flames",
+        "burn",
+        "burning",
+        "burned",
+        "burnt",
+        "blaze",
+        "spark",
+        "sparks",
+        "ember",
+        "embers",
+        "ash",
+        "ashes",
+        "smoke",
+        "coal",
+        "candle",
+        "light",
+        "lights",
+        "bright",
+        "brighter",
+        "shine",
+        "shining",
+        "glow",
+        "glowing",
+        "sun",
+        "sunlight",
+        "sunshine",
+        "dawn",
+        "sunrise",
+        "sunset",
+        "gold",
+        "golden",
+        "heat",
+        "hot",
+        "warm",
+        "warmth",
+        "red",
+        "orange",
+        "yellow",
+        "lightning",
+        "flash",
+        "ignite",
+        "burning",
+        "fever",
+        "inferno",
+        "torch",
+        "lantern",
+        "star",
+        "match"
+      ]
+    }
+  ];
+  var COLOR_WORDS = {
+    red: 0,
+    crimson: 355,
+    scarlet: 5,
+    blood: 0,
+    ruby: 350,
+    orange: 28,
+    amber: 40,
+    rust: 20,
+    copper: 25,
+    yellow: 52,
+    gold: 45,
+    golden: 45,
+    honey: 40,
+    green: 130,
+    emerald: 145,
+    jade: 155,
+    olive: 80,
+    lime: 90,
+    teal: 178,
+    turquoise: 172,
+    cyan: 185,
+    blue: 215,
+    azure: 205,
+    navy: 225,
+    indigo: 245,
+    cobalt: 220,
+    purple: 280,
+    violet: 275,
+    lavender: 270,
+    plum: 300,
+    magenta: 315,
+    pink: 335,
+    rose: 345,
+    blush: 350,
+    brown: 25,
+    bronze: 30,
+    sepia: 35,
+    silver: 210,
+    grey: 210,
+    gray: 210,
+    white: 45,
+    black: 240,
+    ivory: 45
+  };
+  var STOPWORDS = /* @__PURE__ */ new Set([
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "but",
+    "if",
+    "then",
+    "so",
+    "as",
+    "than",
+    "that",
+    "this",
+    "these",
+    "those",
+    "is",
+    "am",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "do",
+    "does",
+    "did",
+    "doing",
+    "have",
+    "has",
+    "had",
+    "having",
+    "will",
+    "would",
+    "shall",
+    "should",
+    "can",
+    "could",
+    "may",
+    "might",
+    "must",
+    "to",
+    "of",
+    "in",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "from",
+    "up",
+    "down",
+    "out",
+    "off",
+    "over",
+    "under",
+    "again",
+    "it",
+    "its",
+    "i",
+    "me",
+    "my",
+    "mine",
+    "you",
+    "your",
+    "yours",
+    "he",
+    "him",
+    "his",
+    "she",
+    "her",
+    "hers",
+    "we",
+    "us",
+    "our",
+    "ours",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "what",
+    "which",
+    "who",
+    "whom",
+    "when",
+    "where",
+    "why",
+    "how",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "not",
+    "only",
+    "own",
+    "same",
+    "too",
+    "very",
+    "just",
+    "now",
+    "get",
+    "got",
+    "go",
+    "going",
+    "gonna",
+    "wanna",
+    "im",
+    "ive",
+    "dont",
+    "cant",
+    "wont",
+    "aint",
+    "yeah",
+    "yea",
+    "ooh",
+    "oh",
+    "uh",
+    "ah",
+    "na",
+    "la",
+    "hey",
+    "em",
+    "ya",
+    "til",
+    "cause",
+    "coz",
+    "let",
+    "lets",
+    "theres",
+    "thats",
+    "youre",
+    "theyre"
+  ]);
+  var PRONOUNS = {
+    first: /* @__PURE__ */ new Set(["i", "me", "my", "mine", "myself", "im", "ive", "ill", "id"]),
+    second: /* @__PURE__ */ new Set(["you", "your", "yours", "yourself", "youre", "youve", "youll"]),
+    collective: /* @__PURE__ */ new Set(["we", "us", "our", "ours", "ourselves", "weve", "well", "were"]),
+    third: /* @__PURE__ */ new Set(["he", "him", "his", "she", "her", "hers", "they", "them", "their", "theirs"])
+  };
+
+  // src/analysis/analyze.ts
+  function clamp(v, lo, hi) {
+    return v < lo ? lo : v > hi ? hi : v;
+  }
+  function chargedAverage(stream, lexicon) {
+    let sum = 0;
+    let hits = 0;
+    for (const w of stream.words) {
+      const score = lexicon[w];
+      if (score !== void 0) {
+        sum += score;
+        hits += 1;
+      }
+    }
+    if (hits === 0) return { mean: 0, coverage: 0 };
+    return { mean: sum / hits, coverage: hits / Math.max(1, stream.words.length) };
+  }
+  function scoreThemes(stream) {
+    const contentTotal = Math.max(
+      1,
+      stream.words.filter((w) => !STOPWORDS.has(w)).length
+    );
+    const scored = THEMES.map((theme) => {
+      const set = new Set(theme.words);
+      const hitCounts = /* @__PURE__ */ new Map();
+      let total = 0;
+      for (const [word, count] of stream.counts) {
+        if (!set.has(word)) continue;
+        total += 1 + Math.log2(count);
+        hitCounts.set(word, count);
+      }
+      const hits = [...hitCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([w]) => w);
+      return { theme, total, share: total / contentTotal, hits };
+    });
+    const peak = Math.max(...scored.map((s) => s.total), 0);
+    return scored.map(({ theme, total, share, hits }) => ({
+      key: theme.key,
+      label: theme.label,
+      gloss: theme.gloss,
+      strength: peak > 0 ? total / peak : 0,
+      share,
+      hits: hits.slice(0, 8)
+    })).sort((a, b) => b.strength - a.strength);
+  }
+  function repetitionRatio(stream) {
+    if (stream.lines.length < 2) return 0;
+    const seen = /* @__PURE__ */ new Map();
+    for (const line of stream.lines) {
+      const key = line.words.join(" ");
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    const repeated = [...seen.values()].reduce((acc, n) => acc + (n > 1 ? n : 0), 0);
+    return clamp(repeated / stream.lines.length, 0, 1);
+  }
+  function rhymeDensity(stream) {
+    const endings = stream.lines.map((l) => l.words[l.words.length - 1]).filter((w) => Boolean(w)).map((w) => {
+      const m = /[aeiouy][a-z]*$/.exec(w);
+      return m ? m[0] : w.slice(-2);
+    });
+    if (endings.length < 2) return 0;
+    const buckets = /* @__PURE__ */ new Map();
+    for (const e of endings) buckets.set(e, (buckets.get(e) ?? 0) + 1);
+    const paired = [...buckets.values()].reduce((acc, n) => acc + (n > 1 ? n : 0), 0);
+    return clamp(paired / endings.length, 0, 1);
+  }
+  function detectVoice(stream) {
+    const tally = { first: 0, second: 0, collective: 0, third: 0 };
+    for (const w of stream.words) {
+      if (PRONOUNS.first.has(w)) tally.first += 1;
+      else if (PRONOUNS.second.has(w)) tally.second += 1;
+      else if (PRONOUNS.collective.has(w)) tally.collective += 1;
+      else if (PRONOUNS.third.has(w)) tally.third += 1;
+    }
+    const entries = [
+      ["confessional", tally.first],
+      ["address", tally.second],
+      ["collective", tally.collective * 1.4],
+      // rarer, so weight it up when present
+      ["observed", tally.third]
+    ];
+    entries.sort((a, b) => b[1] - a[1]);
+    const top = entries[0];
+    return top && top[1] > 0 ? top[0] : "confessional";
+  }
+  function namedHues(stream) {
+    const found = [];
+    for (const [word, count] of stream.counts) {
+      const hue = COLOR_WORDS[word];
+      if (hue !== void 0) found.push({ hue, count });
+    }
+    return found.sort((a, b) => b.count - a.count).map((f) => f.hue);
+  }
+  function signatureWords(stream) {
+    return [...stream.counts.entries()].filter(([w, c]) => !STOPWORDS.has(w) && w.length > 2 && c > 1).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 12).map(([word, count]) => ({ word, count }));
+  }
+  function fingerprint(text) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i += 1) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function analyze(rawLyrics) {
+    const stream = tokenize(rawLyrics);
+    const valenceRead = chargedAverage(stream, VALENCE);
+    const arousalRead = chargedAverage(stream, AROUSAL);
+    const valenceConfidence = clamp(valenceRead.coverage / 0.05, 0, 1);
+    const arousalConfidence = clamp(arousalRead.coverage / 0.04, 0, 1);
+    const lineDensity = stream.lines.length > 0 ? stream.words.length / stream.lines.length : 0;
+    const cadenceEnergy = clamp((9 - lineDensity) / 9, -0.5, 0.5);
+    const uniqueWords = stream.counts.size;
+    const diversity = stream.words.length > 0 ? clamp(uniqueWords / Math.sqrt(stream.words.length * 2), 0, 1) : 0;
+    const questions = stream.lines.filter((l) => l.text.includes("?")).length;
+    return {
+      valence: clamp(valenceRead.mean * valenceConfidence * 1.25, -1, 1),
+      arousal: clamp(
+        0.35 + (arousalRead.mean - 0.35) * arousalConfidence + cadenceEnergy * 0.25,
+        0,
+        1
+      ),
+      repetition: repetitionRatio(stream),
+      diversity,
+      lineDensity,
+      rhyme: rhymeDensity(stream),
+      inquiry: stream.lines.length > 0 ? questions / stream.lines.length : 0,
+      voice: detectVoice(stream),
+      namedHues: namedHues(stream),
+      themes: scoreThemes(stream),
+      signature: signatureWords(stream),
+      wordCount: stream.words.length,
+      lineCount: stream.lines.length,
+      fingerprint: fingerprint(stream.words.join(" "))
+    };
+  }
+
+  // src/analysis/interpret.ts
+  var SYSTEM_BY_THEME = {
+    motion: "current",
+    water: "current",
+    transcendence: "radiance",
+    fire: "radiance",
+    love: "radiance",
+    memory: "strata",
+    loss: "strata",
+    defiance: "fracture",
+    night: "constellation",
+    city: "lattice",
+    nature: "growth",
+    body: "growth"
+  };
+  var SYSTEM_INFO = {
+    current: {
+      label: "Current",
+      description: "Thousands of particles released into a noise field, each tracing where the song pushes it. Nothing is placed; everything is carried."
+    },
+    radiance: {
+      label: "Radiance",
+      description: "Everything organized around a single luminous center \u2014 rays, arcs, and orbits that either resolve into a halo or burn out at the edges."
+    },
+    strata: {
+      label: "Strata",
+      description: "The image laid down in horizontal bands, like sediment or a stack of exposures. Older layers show through the newer ones."
+    },
+    fracture: {
+      label: "Fracture",
+      description: "The picture plane broken into shards and driven apart along hard diagonals. Each fragment keeps a piece of the original field."
+    },
+    constellation: {
+      label: "Constellation",
+      description: "Points of light scattered across a dark ground, with faint lines drawn between the ones that belong together."
+    },
+    lattice: {
+      label: "Lattice",
+      description: "A rigid grid imposed on the canvas, then made to carry something it was not built for. The structure holds, but not evenly."
+    },
+    growth: {
+      label: "Growth",
+      description: "Branching forms grown from seed points, splitting and thinning until they run out of energy."
+    }
+  };
+  var HUE_BY_THEME = {
+    love: 348,
+    loss: 218,
+    defiance: 6,
+    transcendence: 46,
+    nature: 122,
+    night: 246,
+    motion: 196,
+    body: 18,
+    memory: 34,
+    city: 208,
+    water: 202,
+    fire: 24
+  };
+  function clamp2(v, lo, hi) {
+    return v < lo ? lo : v > hi ? hi : v;
+  }
+  function circularMean(hues) {
+    if (hues.length === 0) return 0;
+    let x = 0;
+    let y = 0;
+    for (const h of hues) {
+      const rad = h * Math.PI / 180;
+      x += Math.cos(rad);
+      y += Math.sin(rad);
+    }
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  function pickHarmony(a, dominant) {
+    const contested = a.themes.length > 1 && (a.themes[1]?.strength ?? 0) > 0.72;
+    if (contested) return a.arousal > 0.6 ? "complementary" : "split";
+    if (dominant === "defiance" || dominant === "fire") return "complementary";
+    if (dominant === "night" || dominant === "loss") return "monochrome";
+    if (a.diversity > 0.72) return "triad";
+    return "analogous";
+  }
+  function interpret(analysis, variation = 0) {
+    const dominant = analysis.themes[0];
+    const dominantKey = dominant && dominant.strength > 0 ? dominant.key : "memory";
+    const second = analysis.themes[1];
+    const baseHue = analysis.namedHues.length > 0 ? circularMean(analysis.namedHues.slice(0, 3)) : HUE_BY_THEME[dominantKey];
+    const secondStrength = second?.strength ?? 0;
+    return {
+      system: SYSTEM_BY_THEME[dominantKey],
+      // Variation is folded into the seed so re-rolls are reproducible too.
+      seed: (analysis.fingerprint ^ Math.imul(variation + 1, 2654435769)) >>> 0,
+      baseHue,
+      harmony: pickHarmony(analysis, dominantKey),
+      valence: analysis.valence,
+      arousal: analysis.arousal,
+      // A wordy song puts more on the canvas; a repetitive one puts less, but louder.
+      density: clamp2(0.24 + analysis.diversity * 0.5 + analysis.arousal * 0.28 - analysis.repetition * 0.2, 0.08, 1),
+      // Turbulence is disorder: loud, unresolved, and asking questions.
+      turbulence: clamp2(analysis.arousal * 0.62 + Math.max(0, -analysis.valence) * 0.3 + analysis.inquiry * 0.25, 0, 1),
+      // Songs that address someone or reach upward pull toward a center.
+      gravity: clamp2(
+        (analysis.voice === "address" ? 0.55 : analysis.voice === "collective" ? 0.42 : 0.3) + secondStrength * 0.16 + (dominantKey === "transcendence" || dominantKey === "love" ? 0.24 : 0),
+        0,
+        1
+      ),
+      // Repetition is emphasis, and emphasis is weight.
+      weight: clamp2(0.22 + analysis.repetition * 0.5 + analysis.arousal * 0.26, 0.08, 1),
+      // Rhyme and repeated lines are formal structure, and structure shows as symmetry.
+      symmetry: clamp2(analysis.rhyme * 0.5 + analysis.repetition * 0.42, 0, 1),
+      grain: clamp2(0.26 + Math.max(0, -analysis.valence) * 0.42 + analysis.repetition * 0.18, 0, 1),
+      forceNocturne: dominantKey === "night" || dominantKey === "loss"
+    };
+  }
+  function describeValence(v) {
+    if (v > 0.4) return "radiant";
+    if (v > 0.12) return "warm";
+    if (v > -0.12) return "ambivalent";
+    if (v > -0.4) return "shadowed";
+    return "bleak";
+  }
+  function describeArousal(a) {
+    if (a > 0.72) return "violent";
+    if (a > 0.52) return "driving";
+    if (a > 0.32) return "steady";
+    if (a > 0.16) return "subdued";
+    return "nearly motionless";
+  }
+  var VOICE_NOTE = {
+    confessional: "It speaks in the first person, so the composition keeps a single point of view.",
+    address: "It is addressed to someone, so the forms lean toward a center that is not themselves.",
+    collective: 'It speaks as "we", so the marks gather into crowds rather than individuals.',
+    observed: "It watches other people, so the composition holds its subject at a distance."
+  };
+  function explain(analysis, genome) {
+    const info = SYSTEM_INFO[genome.system];
+    const dominant = analysis.themes[0];
+    const second = analysis.themes[1];
+    const notes = [];
+    if (dominant && dominant.strength > 0) {
+      notes.push(
+        `Strongest field is ${dominant.label.toLowerCase()} \u2014 it ${dominant.gloss}. Triggered by words like ${dominant.hits.slice(0, 4).join(", ")}.`
+      );
+    } else {
+      notes.push(
+        "No thematic field dominates, so the machine falls back to structure alone: rhythm, repetition, and line length."
+      );
+    }
+    if (second && second.strength > 0.5 && dominant) {
+      notes.push(
+        `${second.label} runs underneath at ${Math.round(second.strength * 100)}% of the dominant field, and ${second.gloss}.`
+      );
+    }
+    notes.push(
+      `Emotional register reads ${describeValence(analysis.valence)} and ${describeArousal(analysis.arousal)}, which sets the palette ${genome.forceNocturne || analysis.valence < 0.08 ? "against a dark ground" : "on a pale ground"} at ${Math.round(genome.baseHue)}\xB0 hue.`
+    );
+    notes.push(VOICE_NOTE[analysis.voice]);
+    if (analysis.repetition > 0.3) {
+      notes.push(
+        `${Math.round(analysis.repetition * 100)}% of lines repeat, so marks are heavier and the composition more symmetrical \u2014 the machine treats a hook as insistence.`
+      );
+    } else if (analysis.diversity > 0.65) {
+      notes.push(
+        "Vocabulary is unusually wide and repeats little, so the canvas is dense and detailed rather than bold."
+      );
+    }
+    if (analysis.namedHues.length > 0) {
+      notes.push(
+        `The lyrics name colors directly, so the palette is anchored to what the song says rather than what it means.`
+      );
+    }
+    if (analysis.inquiry > 0.08) {
+      notes.push(
+        `${Math.round(analysis.inquiry * 100)}% of lines are questions, which adds unresolved motion to the field.`
+      );
+    }
+    const mood = describeValence(analysis.valence);
+    const article = /^[aeiou]/.test(mood) ? "An" : "A";
+    const verdict = dominant && dominant.strength > 0 ? `${article} ${mood}, ${describeArousal(analysis.arousal)} song about ${dominant.label.toLowerCase()}, rendered as ${info.label}.` : `${article} ${mood}, ${describeArousal(analysis.arousal)} song, rendered as ${info.label}.`;
+    return {
+      verdict,
+      notes,
+      systemLabel: info.label,
+      systemDescription: info.description
+    };
+  }
+
+  // src/lyrics/providers.ts
+  var TIMEOUT_MS = 9e3;
+  async function fetchWithTimeout(url, signal) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const onAbort = () => controller.abort();
+    signal?.addEventListener("abort", onAbort);
+    try {
+      return await fetch(url, { signal: controller.signal, headers: { Accept: "application/json" } });
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+    }
+  }
+  function stripTimestamps(text) {
+    return text.replace(/\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]/g, "").trim();
+  }
+  async function fromLrclib(artist, track, signal) {
+    const query = [artist, track].filter(Boolean).join(" ").trim();
+    if (!query) return { ok: false, reason: "No artist or track to search for." };
+    const url = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+    try {
+      const response = await fetchWithTimeout(url, signal);
+      if (!response.ok) return { ok: false, reason: `LRCLIB returned ${response.status}.` };
+      const entries = await response.json();
+      if (!Array.isArray(entries) || entries.length === 0) {
+        return { ok: false, reason: "LRCLIB had no match for that title." };
+      }
+      for (const raw of entries) {
+        if (raw.instrumental === true) continue;
+        const plain = typeof raw.plainLyrics === "string" ? raw.plainLyrics : "";
+        const synced = typeof raw.syncedLyrics === "string" ? raw.syncedLyrics : "";
+        const text = plain.trim() || stripTimestamps(synced);
+        if (text.length < 40) continue;
+        return {
+          ok: true,
+          result: {
+            text,
+            source: "lrclib",
+            matchedArtist: typeof raw.artistName === "string" ? raw.artistName : void 0,
+            matchedTrack: typeof raw.trackName === "string" ? raw.trackName : void 0
+          }
+        };
+      }
+      return { ok: false, reason: "LRCLIB matched the title but had no lyrics text." };
+    } catch (error) {
+      const aborted = error instanceof DOMException && error.name === "AbortError";
+      return { ok: false, reason: aborted ? "LRCLIB request timed out." : "Could not reach LRCLIB." };
+    }
+  }
+  async function fromLyricsOvh(artist, track, signal) {
+    if (!artist || !track) {
+      return { ok: false, reason: "lyrics.ovh needs both an artist and a track name." };
+    }
+    const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(track)}`;
+    try {
+      const response = await fetchWithTimeout(url, signal);
+      if (!response.ok) return { ok: false, reason: `lyrics.ovh returned ${response.status}.` };
+      const data = await response.json();
+      const text = typeof data.lyrics === "string" ? data.lyrics.trim() : "";
+      if (text.length < 40) return { ok: false, reason: "lyrics.ovh had no usable text." };
+      return { ok: true, result: { text, source: "lyrics.ovh", matchedArtist: artist, matchedTrack: track } };
+    } catch (error) {
+      const aborted = error instanceof DOMException && error.name === "AbortError";
+      return { ok: false, reason: aborted ? "lyrics.ovh request timed out." : "Could not reach lyrics.ovh." };
+    }
+  }
+
+  // src/lyrics/youtube.ts
+  var ID_RE = /^[A-Za-z0-9_-]{11}$/;
+  function parseVideoRef(input) {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    if (ID_RE.test(trimmed)) {
+      return { id: trimmed, url: `https://www.youtube.com/watch?v=${trimmed}` };
+    }
+    let url;
+    try {
+      url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    } catch {
+      return null;
+    }
+    const host = url.hostname.replace(/^www\./, "");
+    let id = null;
+    if (host === "youtu.be") {
+      id = url.pathname.slice(1).split("/")[0] ?? null;
+    } else if (host.endsWith("youtube.com") || host.endsWith("youtube-nocookie.com")) {
+      const v = url.searchParams.get("v");
+      if (v) {
+        id = v;
+      } else {
+        const segments = url.pathname.split("/").filter(Boolean);
+        if (segments.length >= 2 && ["shorts", "embed", "live", "v"].includes(segments[0])) {
+          id = segments[1];
+        }
+      }
+    }
+    if (!id || !ID_RE.test(id)) return null;
+    return { id, url: `https://www.youtube.com/watch?v=${id}` };
+  }
+  var NOISE_PATTERNS = [
+    /\b(official|officiel)\s*(music\s*)?(video|audio|visualizer|lyric\s*video|version|hd|4k)\b/gi,
+    /\b(music\s*video|lyric[s]?\s*video|audio\s*only|visuali[sz]er)\b/gi,
+    /\b(hd|hq|4k|8k|1080p|720p|remaster(ed)?(\s*\d{4})?)\b/gi,
+    /\b(with\s*)?lyrics\b/gi,
+    /\b(full\s*(album|song|version))\b/gi,
+    /\b(live\s*(at|from|in|on)\s*[^)\]]*)/gi,
+    /\bfeat\.?\b|\bft\.?\b/gi
+  ];
+  function stripDecorations(text) {
+    let out = text;
+    out = out.replace(/[([{]([^)\]}]*)[)\]}]/g, (match, inner) => {
+      const looksLikeNoise = NOISE_PATTERNS.some((re) => {
+        re.lastIndex = 0;
+        return re.test(inner);
+      });
+      return looksLikeNoise ? " " : match;
+    });
+    for (const re of NOISE_PATTERNS) {
+      re.lastIndex = 0;
+      out = out.replace(re, " ");
+    }
+    return out.replace(/[|｜]/g, " ").replace(/\s{2,}/g, " ").replace(/^[\s\-–—:,]+|[\s\-–—:,]+$/g, "").trim();
+  }
+  var CHANNEL_SUFFIX_RE = /\s*[-–—]?\s*(vevo|official|music|records|topic|tv|channel)\s*$/i;
+  function cleanChannel(author) {
+    let out = author.trim();
+    for (let i = 0; i < 2; i += 1) out = out.replace(CHANNEL_SUFFIX_RE, "").trim();
+    return out;
+  }
+  function guessTrack(meta) {
+    const cleanedTitle = stripDecorations(meta.title);
+    const channel = cleanChannel(meta.author);
+    const separators = [" - ", " \u2013 ", " \u2014 ", " -- ", ": "];
+    for (const sep of separators) {
+      const index = cleanedTitle.indexOf(sep);
+      if (index <= 0) continue;
+      const left = cleanedTitle.slice(0, index).trim();
+      const right = cleanedTitle.slice(index + sep.length).trim();
+      if (!left || !right) continue;
+      const reversed = channel && right.toLowerCase().includes(channel.toLowerCase());
+      return {
+        artist: reversed ? right : left,
+        track: reversed ? left : right,
+        confidence: 0.85
+      };
+    }
+    const quoted = /["“]([^"”]{2,})["”]/.exec(cleanedTitle);
+    if (quoted?.[1] && channel) {
+      return { artist: channel, track: quoted[1].trim(), confidence: 0.7 };
+    }
+    if (channel && cleanedTitle) {
+      return { artist: channel, track: cleanedTitle, confidence: 0.5 };
+    }
+    return { artist: "", track: cleanedTitle || meta.title, confidence: 0.2 };
+  }
+  async function fetchVideoMeta(ref, signal) {
+    const endpoint = `https://www.youtube.com/oembed?url=${encodeURIComponent(ref.url)}&format=json`;
+    try {
+      const response = await fetch(endpoint, { signal });
+      if (!response.ok) return null;
+      const data = await response.json();
+      const title = typeof data.title === "string" ? data.title : "";
+      if (!title) return null;
+      return {
+        id: ref.id,
+        url: ref.url,
+        title,
+        author: typeof data.author_name === "string" ? data.author_name : "",
+        thumbnail: typeof data.thumbnail_url === "string" ? data.thumbnail_url : `https://i.ytimg.com/vi/${ref.id}/hqdefault.jpg`
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  // src/lyrics/index.ts
+  async function acquire(input, options = {}) {
+    const { signal, onStatus } = options;
+    const attempts = [];
+    const ref = parseVideoRef(input);
+    if (!ref) {
+      return {
+        ok: false,
+        meta: null,
+        guess: null,
+        attempts,
+        reason: "That doesn't look like a YouTube link. Paste a watch, youtu.be, or shorts URL."
+      };
+    }
+    onStatus?.("Reading the video\u2026");
+    const meta = await fetchVideoMeta(ref, signal);
+    if (!meta) {
+      attempts.push("YouTube would not return the video title (private, deleted, or blocked).");
+      return {
+        ok: false,
+        meta: null,
+        guess: null,
+        attempts,
+        reason: "Could not read that video. Paste the lyrics below and the machine will read them directly."
+      };
+    }
+    const guess = guessTrack(meta);
+    attempts.push(
+      `Read the video as \u201C${guess.track}\u201D${guess.artist ? ` by ${guess.artist}` : ""}.`
+    );
+    onStatus?.("Looking for the words\u2026");
+    const lrclib = await fromLrclib(guess.artist, guess.track, signal);
+    if (lrclib.ok) return { ok: true, meta, guess, lyrics: lrclib.result };
+    attempts.push(lrclib.reason);
+    const ovh = await fromLyricsOvh(guess.artist, guess.track, signal);
+    if (ovh.ok) return { ok: true, meta, guess, lyrics: ovh.result };
+    attempts.push(ovh.reason);
+    if (guess.confidence < 0.85 || guess.artist) {
+      onStatus?.("Trying the title on its own\u2026");
+      const bare = await fromLrclib("", guess.track, signal);
+      if (bare.ok) return { ok: true, meta, guess, lyrics: bare.result };
+      attempts.push(bare.reason);
+    }
+    return {
+      ok: false,
+      meta,
+      guess,
+      attempts,
+      reason: "No lyrics database had this one. Paste the words below and the machine will read them directly."
+    };
+  }
+
+  // src/art/color.ts
+  function hsl(h, s, l, a = 1) {
+    const hue = (h % 360 + 360) % 360;
+    const sat = Math.max(0, Math.min(100, s));
+    const lum = Math.max(0, Math.min(100, l));
+    return a >= 1 ? `hsl(${hue.toFixed(1)} ${sat.toFixed(1)}% ${lum.toFixed(1)}%)` : `hsl(${hue.toFixed(1)} ${sat.toFixed(1)}% ${lum.toFixed(1)}% / ${a.toFixed(3)})`;
+  }
+  var HARMONY_OFFSETS = {
+    analogous: [0, 22, -22, 42],
+    complementary: [0, 180, 18, 198],
+    triad: [0, 120, 240, 30],
+    split: [0, 150, 210, 20],
+    monochrome: [0, 8, -8, 4]
+  };
+  function buildPalette(input) {
+    const { baseHue, harmony, valence, arousal, rng } = input;
+    const nocturne = input.forceNocturne ?? valence < 0.08;
+    const saturation = 28 + arousal * 46 + Math.abs(valence) * 12;
+    const offsets = HARMONY_OFFSETS[harmony];
+    const groundLightness = nocturne ? 6 + Math.max(0, valence) * 6 + rng.range(0, 3) : 91 - Math.max(0, -valence) * 8 + rng.range(-2, 2);
+    const ground = hsl(
+      baseHue + rng.range(-12, 12),
+      nocturne ? saturation * 0.5 : saturation * 0.14,
+      groundLightness
+    );
+    const marks = offsets.map((offset, i) => {
+      const drift = rng.range(-9, 9);
+      const step = i / Math.max(1, offsets.length - 1);
+      const lightness = nocturne ? 42 + step * 30 + arousal * 12 : 46 - step * 26 - arousal * 8;
+      return hsl(
+        baseHue + offset + drift,
+        saturation * (0.72 + step * 0.35),
+        lightness
+      );
+    });
+    const accentHue = baseHue + (rng.bool() ? 168 : -168) + rng.range(-14, 14);
+    const accent = hsl(
+      accentHue,
+      Math.min(96, saturation * 1.5 + 18),
+      nocturne ? 62 + arousal * 16 : 48 + arousal * 10
+    );
+    const veil = hsl(
+      baseHue + rng.range(-20, 20),
+      saturation * 0.35,
+      nocturne ? 74 : 22
+    );
+    return { ground, marks, accent, veil, nocturne };
+  }
+
+  // src/art/rng.ts
+  function makeRng(seed) {
+    let state = seed >>> 0;
+    const next = () => {
+      state = state + 1831565813 >>> 0;
+      let t = state;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+    return {
+      next,
+      range: (lo, hi) => lo + next() * (hi - lo),
+      int: (lo, hi) => Math.floor(lo + next() * (hi - lo + 1)),
+      bool: (probability = 0.5) => next() < probability,
+      pick: (items) => {
+        if (items.length === 0) throw new Error("pick() called with an empty list");
+        return items[Math.floor(next() * items.length)];
+      },
+      /** Bell-ish distribution around a center — most values near the middle. */
+      gaussian: (center = 0, spread = 1) => {
+        const u = Math.max(next(), Number.EPSILON);
+        const v = next();
+        return center + Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v) * spread;
+      }
+    };
+  }
+  function makeNoise2D(seed) {
+    const perm = new Uint8Array(512);
+    const rng = makeRng(seed);
+    const base = new Uint8Array(256);
+    for (let i = 0; i < 256; i += 1) base[i] = i;
+    for (let i = 255; i > 0; i -= 1) {
+      const j = rng.int(0, i);
+      const tmp = base[i];
+      base[i] = base[j];
+      base[j] = tmp;
+    }
+    for (let i = 0; i < 512; i += 1) perm[i] = base[i & 255];
+    const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const grad = (hash, x, y) => {
+      switch (hash & 3) {
+        case 0:
+          return x + y;
+        case 1:
+          return -x + y;
+        case 2:
+          return x - y;
+        default:
+          return -x - y;
+      }
+    };
+    return (x, y) => {
+      const xi = Math.floor(x) & 255;
+      const yi = Math.floor(y) & 255;
+      const xf = x - Math.floor(x);
+      const yf = y - Math.floor(y);
+      const u = fade(xf);
+      const v = fade(yf);
+      const aa = perm[perm[xi] + yi];
+      const ab = perm[perm[xi] + yi + 1];
+      const ba = perm[perm[xi + 1] + yi];
+      const bb = perm[perm[xi + 1] + yi + 1];
+      const x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u);
+      const x2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u);
+      return (lerp(x1, x2, v) + 1) / 2;
+    };
+  }
+
+  // src/art/systems/current.ts
+  var current = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const particleCount = Math.round(600 + genome.density * 2600);
+    const stepsPerParticle = Math.round(60 + (1 - genome.turbulence) * 260);
+    const scale = 7e-4 + genome.turbulence * 22e-4;
+    const stepLength = unit * (16e-4 + genome.arousal * 4e-3);
+    const lineWidth = unit * (4e-4 + genome.weight * 42e-4);
+    const driftAngle = rng.range(0, Math.PI * 2);
+    const driftStrength = 0.28 + genome.gravity * 0.5;
+    ctx.lineCap = "round";
+    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "multiply";
+    for (let p = 0; p < particleCount; p += 1) {
+      let x = rng.range(-unit * 0.1, width + unit * 0.1);
+      let y = rng.range(-unit * 0.1, height + unit * 0.1);
+      const tone = rng.next();
+      const color = tone > 0.94 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.05 + rng.next() * (0.12 + genome.weight * 0.2);
+      ctx.lineWidth = lineWidth * rng.range(0.5, 1.9);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      const life = Math.round(stepsPerParticle * rng.range(0.35, 1.2));
+      for (let s = 0; s < life; s += 1) {
+        const n = noise(x * scale, y * scale);
+        const fieldAngle = n * Math.PI * 4;
+        const angle = fieldAngle * (1 - driftStrength) + driftAngle * driftStrength;
+        x += Math.cos(angle) * stepLength;
+        y += Math.sin(angle) * stepLength;
+        if (x < -unit * 0.2 || x > width + unit * 0.2 || y < -unit * 0.2 || y > height + unit * 0.2) break;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      if (p % 24 === 0) yield p / particleCount;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    const anchors = Math.round(3 + genome.weight * 9);
+    for (let i = 0; i < anchors; i += 1) {
+      let x = rng.range(0, width);
+      let y = rng.range(0, height);
+      ctx.strokeStyle = i % 3 === 0 ? palette.accent : palette.marks[0];
+      ctx.globalAlpha = 0.5 + rng.next() * 0.4;
+      ctx.lineWidth = lineWidth * rng.range(4, 11);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      for (let s = 0; s < 220; s += 1) {
+        const angle = noise(x * scale, y * scale) * Math.PI * 4 * (1 - driftStrength) + driftAngle * driftStrength;
+        x += Math.cos(angle) * stepLength * 1.6;
+        y += Math.sin(angle) * stepLength * 1.6;
+        if (x < 0 || x > width || y < 0 || y > height) break;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      yield 0.9 + i / anchors * 0.1;
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  // src/art/systems/radiance.ts
+  var radiance = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const cx = width / 2 + rng.gaussian(0, unit * 0.06 * (1 + genome.turbulence));
+    const cy = height / 2 + rng.gaussian(0, unit * 0.05 * (1 + genome.turbulence));
+    const maxRadius = Math.hypot(width, height) * 0.62;
+    const coreRadius = unit * (0.06 + genome.gravity * 0.16);
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 3.2);
+    core.addColorStop(0, palette.nocturne ? hsl(genome.baseHue, 90, 88, 0.95) : hsl(genome.baseHue, 70, 96, 0.9));
+    core.addColorStop(0.35, palette.accent);
+    core.addColorStop(1, "hsl(0 0% 0% / 0)");
+    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreRadius * 3.2, 0, Math.PI * 2);
+    ctx.fill();
+    yield 0.05;
+    const rayCount = Math.round(60 + genome.density * 460);
+    ctx.lineCap = "round";
+    for (let i = 0; i < rayCount; i += 1) {
+      const even = i / rayCount * Math.PI * 2;
+      const scattered = rng.range(0, Math.PI * 2);
+      const angle = even * genome.symmetry + scattered * (1 - genome.symmetry);
+      const inner = coreRadius * rng.range(0.7, 1.6);
+      const outer = inner + maxRadius * rng.range(0.12, 1) * (0.4 + genome.arousal * 0.8);
+      ctx.strokeStyle = rng.next() > 0.9 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
+      ctx.globalAlpha = 0.08 + rng.next() * (0.18 + genome.weight * 0.3);
+      ctx.lineWidth = unit * (4e-4 + genome.weight * 5e-3) * rng.range(0.4, 2.2);
+      ctx.beginPath();
+      const segments = 14;
+      for (let s = 0; s <= segments; s += 1) {
+        const t = s / segments;
+        const r = inner + (outer - inner) * t;
+        const wobble = (noise(Math.cos(angle) * r * 4e-3, Math.sin(angle) * r * 4e-3) - 0.5) * genome.turbulence * 0.9 * t;
+        const a = angle + wobble;
+        const px = cx + Math.cos(a) * r;
+        const py = cy + Math.sin(a) * r;
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      if (i % 20 === 0) yield 0.05 + i / rayCount * 0.55;
+    }
+    const orbitCount = Math.round(4 + genome.density * 22);
+    for (let i = 0; i < orbitCount; i += 1) {
+      const r = coreRadius * 1.5 + (maxRadius - coreRadius) * ((i + rng.range(0, 0.6)) / orbitCount);
+      const start = rng.range(0, Math.PI * 2);
+      const sweep = Math.PI * 2 * (0.25 + (1 - genome.turbulence) * rng.range(0.3, 0.75));
+      ctx.strokeStyle = i % 5 === 0 ? palette.accent : palette.marks[i % palette.marks.length];
+      ctx.globalAlpha = 0.18 + rng.next() * 0.4;
+      ctx.lineWidth = unit * (6e-4 + genome.weight * 4e-3) * rng.range(0.6, 2.4);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, start + sweep);
+      ctx.stroke();
+      yield 0.6 + i / orbitCount * 0.25;
+    }
+    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
+    const motes = Math.round(120 + genome.density * 900);
+    for (let i = 0; i < motes; i += 1) {
+      const angle = rng.range(0, Math.PI * 2);
+      const r = coreRadius + Math.pow(rng.next(), 1.7) * maxRadius;
+      const px = cx + Math.cos(angle) * r;
+      const py = cy + Math.sin(angle) * r;
+      const size = unit * 1e-3 * rng.range(0.4, 3.4) * (1 + genome.weight);
+      ctx.fillStyle = rng.next() > 0.85 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
+      ctx.globalAlpha = 0.15 + rng.next() * 0.55;
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fill();
+      if (i % 60 === 0) yield 0.85 + i / motes * 0.15;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+  };
+
+  // src/art/systems/strata.ts
+  var strata = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const bandCount = Math.round(14 + genome.density * 70);
+    const roughness = unit * (4e-3 + genome.turbulence * 0.05);
+    const scale = 16e-4 + genome.turbulence * 4e-3;
+    let y = height * rng.range(1.02, 1.12);
+    let index = 0;
+    while (y > -height * 0.1 && index < bandCount * 2) {
+      const thickness = height / bandCount * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25);
+      const top = y - thickness;
+      const color = index % 7 === 0 ? palette.accent : palette.marks[index % palette.marks.length];
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.2 + rng.next() * (0.35 + genome.weight * 0.4);
+      ctx.beginPath();
+      ctx.moveTo(-roughness, y);
+      const segments = Math.max(24, Math.round(width / 12));
+      for (let s = 0; s <= segments; s += 1) {
+        const px = s / segments * width;
+        const displacement = (noise(px * scale, top * scale + index * 0.7) - 0.5) * roughness * 2;
+        ctx.lineTo(px, top + displacement);
+      }
+      ctx.lineTo(width + roughness, y);
+      ctx.closePath();
+      ctx.fill();
+      const hairlines = Math.round(genome.density * 14);
+      ctx.globalAlpha = 0.1 + genome.weight * 0.25;
+      ctx.lineWidth = unit * 6e-4;
+      ctx.strokeStyle = palette.veil;
+      for (let h = 0; h < hairlines; h += 1) {
+        const hy = top + thickness * rng.next();
+        ctx.beginPath();
+        const startX = rng.range(-width * 0.1, width * 0.6);
+        const endX = startX + rng.range(width * 0.15, width * 0.9);
+        for (let s = 0; s <= 20; s += 1) {
+          const px = startX + (endX - startX) * s / 20;
+          const displacement = (noise(px * scale * 1.6, hy * scale * 1.6) - 0.5) * roughness;
+          if (s === 0) ctx.moveTo(px, hy + displacement);
+          else ctx.lineTo(px, hy + displacement);
+        }
+        ctx.stroke();
+      }
+      y = top - thickness * rng.range(0.02, 0.3);
+      index += 1;
+      yield Math.min(0.75, index / bandCount);
+    }
+    const faults = Math.round(genome.turbulence * 9);
+    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "multiply";
+    for (let f = 0; f < faults; f += 1) {
+      const fx = rng.range(width * 0.08, width * 0.92);
+      ctx.strokeStyle = f % 2 === 0 ? palette.accent : palette.veil;
+      ctx.globalAlpha = 0.25 + rng.next() * 0.4;
+      ctx.lineWidth = unit * (1e-3 + genome.weight * 6e-3) * rng.range(0.5, 2);
+      ctx.beginPath();
+      let px = fx;
+      for (let s = 0; s <= 60; s += 1) {
+        const py = s / 60 * height;
+        px += (noise(fx * 0.01, py * scale * 3) - 0.5) * roughness * 0.9;
+        if (s === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      yield 0.75 + f / Math.max(1, faults) * 0.15;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    const horizonY = height * (0.32 + rng.next() * 0.36);
+    ctx.strokeStyle = palette.accent;
+    ctx.globalAlpha = 0.55 + genome.gravity * 0.35;
+    ctx.lineWidth = unit * (12e-4 + genome.weight * 3e-3);
+    ctx.beginPath();
+    ctx.moveTo(0, horizonY);
+    ctx.lineTo(width, horizonY);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    yield 1;
+  };
+
+  // src/art/systems/fracture.ts
+  function split(shard, angle, bias) {
+    const pts = shard.points;
+    let cx = 0;
+    let cy = 0;
+    for (const [x, y] of pts) {
+      cx += x;
+      cy += y;
+    }
+    cx /= pts.length;
+    cy /= pts.length;
+    const nx = Math.cos(angle);
+    const ny = Math.sin(angle);
+    const offset = bias;
+    const side = (p) => (p[0] - cx) * nx + (p[1] - cy) * ny - offset;
+    const a = [];
+    const b = [];
+    for (let i = 0; i < pts.length; i += 1) {
+      const p = pts[i];
+      const q = pts[(i + 1) % pts.length];
+      const sp = side(p);
+      const sq = side(q);
+      if (sp >= 0) a.push(p);
+      else b.push(p);
+      if (sp >= 0 !== sq >= 0) {
+        const t = sp / (sp - sq);
+        const intersection = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+        a.push(intersection);
+        b.push(intersection);
+      }
+    }
+    const out = [];
+    if (a.length >= 3) out.push({ points: a, depth: shard.depth + 1 });
+    if (b.length >= 3) out.push({ points: b, depth: shard.depth + 1 });
+    return out.length === 2 ? out : [shard];
+  }
+  var fracture = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const bleed = unit * 0.08;
+    let shards = [
+      {
+        points: [
+          [-bleed, -bleed],
+          [width + bleed, -bleed],
+          [width + bleed, height + bleed],
+          [-bleed, height + bleed]
+        ],
+        depth: 0
+      }
+    ];
+    const primaryAngle = rng.range(0, Math.PI);
+    const angleSpread = 0.25 + genome.turbulence * 1.3;
+    const targetShards = Math.round(12 + genome.density * 150);
+    while (shards.length < targetShards) {
+      let widestIndex = 0;
+      let widestArea = -1;
+      const sampleCount = Math.min(shards.length, 8);
+      for (let i = 0; i < sampleCount; i += 1) {
+        const candidate = rng.int(0, shards.length - 1);
+        const pts = shards[candidate].points;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const [x, y] of pts) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+        const area = (maxX - minX) * (maxY - minY);
+        if (area > widestArea) {
+          widestArea = area;
+          widestIndex = candidate;
+        }
+      }
+      const target = shards[widestIndex];
+      if (target.depth > 9) break;
+      const angle = primaryAngle + rng.gaussian(0, angleSpread);
+      const bias = rng.gaussian(0, unit * 0.06 * (1 + genome.turbulence));
+      const pieces = split(target, angle, bias);
+      if (pieces.length === 2) {
+        shards.splice(widestIndex, 1, ...pieces);
+      } else {
+        break;
+      }
+      if (shards.length % 12 === 0) yield shards.length / targetShards * 0.5;
+    }
+    const push = unit * (4e-3 + genome.turbulence * 0.05);
+    const dx = Math.cos(primaryAngle + Math.PI / 2);
+    const dy = Math.sin(primaryAngle + Math.PI / 2);
+    for (let i = 0; i < shards.length; i += 1) {
+      const shard = shards[i];
+      let cx = 0;
+      let cy = 0;
+      for (const [x, y] of shard.points) {
+        cx += x;
+        cy += y;
+      }
+      cx /= shard.points.length;
+      cy /= shard.points.length;
+      const distance = Math.hypot(cx - width / 2, cy - height / 2) / (unit * 0.5);
+      const shove = push * distance * rng.range(-1, 1.4);
+      ctx.save();
+      ctx.translate(dx * shove, dy * shove);
+      ctx.beginPath();
+      const first = shard.points[0];
+      ctx.moveTo(first[0], first[1]);
+      for (let p = 1; p < shard.points.length; p += 1) {
+        const pt = shard.points[p];
+        ctx.lineTo(pt[0], pt[1]);
+      }
+      ctx.closePath();
+      const tone = noise(cx * 22e-4, cy * 22e-4);
+      const paletteIndex = Math.min(
+        palette.marks.length - 1,
+        Math.floor(tone * palette.marks.length)
+      );
+      ctx.fillStyle = rng.next() > 0.93 ? palette.accent : palette.marks[paletteIndex];
+      ctx.globalAlpha = 0.3 + tone * (0.4 + genome.weight * 0.4);
+      ctx.fill();
+      ctx.strokeStyle = palette.nocturne ? palette.veil : "hsl(0 0% 8% / 0.75)";
+      ctx.globalAlpha = 0.35 + genome.weight * 0.5;
+      ctx.lineWidth = unit * (4e-4 + genome.weight * 35e-4);
+      ctx.stroke();
+      ctx.restore();
+      if (i % 10 === 0) yield 0.5 + i / shards.length * 0.45;
+    }
+    const slashes = Math.round(2 + genome.arousal * 8);
+    ctx.globalAlpha = 0.7;
+    ctx.lineCap = "square";
+    for (let i = 0; i < slashes; i += 1) {
+      const angle = primaryAngle + rng.gaussian(0, 0.4);
+      const cx = rng.range(0, width);
+      const cy = rng.range(0, height);
+      const length = unit * rng.range(0.4, 1.5);
+      ctx.strokeStyle = i % 2 === 0 ? palette.accent : palette.marks[0];
+      ctx.lineWidth = unit * (8e-4 + genome.weight * 5e-3) * rng.range(0.5, 2.5);
+      ctx.beginPath();
+      ctx.moveTo(cx - Math.cos(angle) * length, cy - Math.sin(angle) * length);
+      ctx.lineTo(cx + Math.cos(angle) * length, cy + Math.sin(angle) * length);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    yield 1;
+  };
+
+  // src/art/systems/constellation.ts
+  var constellation = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const clouds = Math.round(6 + genome.density * 20);
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < clouds; i += 1) {
+      const cx = rng.range(0, width);
+      const cy = rng.range(0, height);
+      const r = unit * rng.range(0.1, 0.55);
+      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      gradient.addColorStop(0, palette.marks[rng.int(0, palette.marks.length - 1)]);
+      gradient.addColorStop(1, "hsl(0 0% 0% / 0)");
+      ctx.globalAlpha = 0.05 + rng.next() * 0.14;
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      yield i / clouds * 0.15;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    const starCount = Math.round(180 + genome.density * 1500);
+    const stars = [];
+    let attempts = 0;
+    while (stars.length < starCount && attempts < starCount * 6) {
+      attempts += 1;
+      const x = rng.range(0, width);
+      const y = rng.range(0, height);
+      const clusterBias = noise(x * 18e-4, y * 18e-4);
+      if (rng.next() > clusterBias * (0.5 + genome.density)) continue;
+      stars.push({
+        x,
+        y,
+        size: unit * 9e-4 * rng.range(0.4, 4) * (1 + genome.weight * 1.4),
+        brightness: rng.next()
+      });
+    }
+    yield 0.25;
+    const linkRadius = unit * (0.05 + genome.gravity * 0.1 + genome.turbulence * 0.04);
+    ctx.lineWidth = unit * 35e-5 * (1 + genome.weight);
+    for (let i = 0; i < stars.length; i += 1) {
+      const a = stars[i];
+      if (a.brightness < 0.55) continue;
+      for (let j = i + 1; j < stars.length; j += 1) {
+        const b = stars[j];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d > linkRadius) continue;
+        if (rng.next() > 0.22) continue;
+        ctx.strokeStyle = palette.veil;
+        ctx.globalAlpha = (1 - d / linkRadius) * 0.32;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+      if (i % 40 === 0) yield 0.25 + i / stars.length * 0.35;
+    }
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < stars.length; i += 1) {
+      const star = stars[i];
+      const isBright = star.brightness > 0.93;
+      ctx.fillStyle = isBright ? palette.accent : palette.marks[Math.floor(star.brightness * palette.marks.length) % palette.marks.length];
+      ctx.globalAlpha = 0.3 + star.brightness * 0.65;
+      ctx.beginPath();
+      ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+      ctx.fill();
+      if (isBright) {
+        const glow = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.size * 14);
+        glow.addColorStop(0, palette.accent);
+        glow.addColorStop(1, "hsl(0 0% 0% / 0)");
+        ctx.globalAlpha = 0.28;
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size * 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = palette.accent;
+        ctx.globalAlpha = 0.5;
+        ctx.lineWidth = star.size * 0.5;
+        const flare = star.size * rng.range(6, 16);
+        ctx.beginPath();
+        ctx.moveTo(star.x - flare, star.y);
+        ctx.lineTo(star.x + flare, star.y);
+        ctx.moveTo(star.x, star.y - flare);
+        ctx.lineTo(star.x, star.y + flare);
+        ctx.stroke();
+      }
+      if (i % 80 === 0) yield 0.6 + i / stars.length * 0.4;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+  };
+
+  // src/art/systems/lattice.ts
+  var lattice = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const margin = unit * 0.04;
+    const maxDepth = Math.round(3 + genome.density * 5);
+    const cells = [];
+    const queue = [
+      { x: margin, y: margin, w: width - margin * 2, h: height - margin * 2, depth: 0 }
+    ];
+    while (queue.length > 0) {
+      const cell = queue.pop();
+      const field = noise(cell.x * 16e-4, cell.y * 16e-4);
+      const shouldSplit = cell.depth < maxDepth && cell.w > unit * 0.03 && cell.h > unit * 0.03 && rng.next() < 0.42 + field * 0.5;
+      if (!shouldSplit) {
+        cells.push(cell);
+        continue;
+      }
+      const vertical = cell.w > cell.h ? true : cell.h > cell.w ? false : rng.bool();
+      const middle = 0.5;
+      const ratio = middle + rng.gaussian(0, 0.16 * (1 - genome.symmetry * 0.7));
+      const clamped = Math.max(0.18, Math.min(0.82, ratio));
+      if (vertical) {
+        const w1 = cell.w * clamped;
+        queue.push({ x: cell.x, y: cell.y, w: w1, h: cell.h, depth: cell.depth + 1 });
+        queue.push({ x: cell.x + w1, y: cell.y, w: cell.w - w1, h: cell.h, depth: cell.depth + 1 });
+      } else {
+        const h1 = cell.h * clamped;
+        queue.push({ x: cell.x, y: cell.y, w: cell.w, h: h1, depth: cell.depth + 1 });
+        queue.push({ x: cell.x, y: cell.y + h1, w: cell.w, h: cell.h - h1, depth: cell.depth + 1 });
+      }
+    }
+    yield 0.2;
+    const gutter = unit * 2e-3 * (1 + genome.weight);
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = cells[i];
+      const field = noise(cell.x * 3e-3 + 40, cell.y * 3e-3 + 40);
+      const broken = rng.next() < genome.turbulence * 0.16;
+      const shove = broken ? unit * 0.02 * genome.turbulence : 0;
+      const x = cell.x + gutter + (broken ? rng.range(-shove, shove) : 0);
+      const y = cell.y + gutter + (broken ? rng.range(-shove, shove) : 0);
+      const w = Math.max(1, cell.w - gutter * 2);
+      const h = Math.max(1, cell.h - gutter * 2);
+      const color = broken || rng.next() > 0.94 ? palette.accent : palette.marks[Math.floor(field * palette.marks.length) % palette.marks.length];
+      const treatment = rng.next();
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      if (treatment < 0.34) {
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.2 + field * (0.4 + genome.weight * 0.4);
+        ctx.fillRect(x, y, w, h);
+      } else if (treatment < 0.62) {
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.3 + field * 0.4;
+        ctx.lineWidth = unit * 6e-4 * (1 + genome.weight * 2);
+        const spacing = Math.max(3, unit * 6e-3 * (1.6 - genome.density));
+        const diagonal = field > 0.5;
+        const span = w + h;
+        for (let s = -span; s < span; s += spacing) {
+          ctx.beginPath();
+          if (diagonal) {
+            ctx.moveTo(x + s, y);
+            ctx.lineTo(x + s + h, y + h);
+          } else {
+            ctx.moveTo(x, y + s);
+            ctx.lineTo(x + w, y + s);
+          }
+          ctx.stroke();
+        }
+      } else if (treatment < 0.84) {
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.45 + field * 0.4;
+        ctx.lineWidth = unit * 8e-4 * (1 + genome.weight * 3);
+        ctx.strokeRect(x, y, w, h);
+      } else {
+        const cols = Math.max(1, Math.round(w / (unit * 0.014)));
+        const rows = Math.max(1, Math.round(h / (unit * 0.02)));
+        for (let c = 0; c < cols; c += 1) {
+          for (let r = 0; r < rows; r += 1) {
+            if (rng.next() > 0.42 + genome.density * 0.3) continue;
+            ctx.fillStyle = rng.next() > 0.88 ? palette.accent : color;
+            ctx.globalAlpha = 0.3 + rng.next() * 0.6;
+            ctx.fillRect(
+              x + (c + 0.22) * (w / cols),
+              y + (r + 0.22) * (h / rows),
+              w / cols * 0.56,
+              h / rows * 0.56
+            );
+          }
+        }
+      }
+      ctx.restore();
+      if (i % 12 === 0) yield 0.2 + i / cells.length * 0.65;
+    }
+    const runs = Math.round(3 + genome.density * 16);
+    ctx.lineCap = "square";
+    ctx.lineJoin = "miter";
+    for (let i = 0; i < runs; i += 1) {
+      ctx.strokeStyle = i % 4 === 0 ? palette.accent : palette.veil;
+      ctx.globalAlpha = 0.3 + rng.next() * 0.45;
+      ctx.lineWidth = unit * (6e-4 + genome.weight * 3e-3);
+      let px = rng.range(0, width);
+      let py = rng.range(0, height);
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      const legs = rng.int(3, 9);
+      for (let l = 0; l < legs; l += 1) {
+        const length = unit * rng.range(0.04, 0.3);
+        if (l % 2 === 0) px += rng.bool() ? length : -length;
+        else py += rng.bool() ? length : -length;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      ctx.fillStyle = palette.accent;
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.arc(px, py, unit * 25e-4 * (1 + genome.weight), 0, Math.PI * 2);
+      ctx.fill();
+      yield 0.85 + i / runs * 0.15;
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  // src/art/systems/growth.ts
+  var growth = function* (env) {
+    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const seedCount = Math.round(2 + genome.density * 12);
+    const branches = [];
+    for (let i = 0; i < seedCount; i += 1) {
+      const grounded = rng.next() < genome.gravity;
+      branches.push({
+        x: grounded ? rng.range(0, width) : rng.range(width * 0.1, width * 0.9),
+        y: grounded ? height * rng.range(0.94, 1.02) : rng.range(height * 0.15, height * 0.9),
+        angle: grounded ? -Math.PI / 2 + rng.gaussian(0, 0.3) : rng.range(0, Math.PI * 2),
+        energy: unit * rng.range(0.34, 0.6) * (0.65 + genome.density * 0.6),
+        thickness: unit * (2e-3 + genome.weight * 0.012) * rng.range(0.7, 1.4),
+        generation: 0
+      });
+    }
+    ctx.lineCap = "round";
+    const splitAngle = 0.28 + genome.turbulence * 0.75;
+    const wander = 0.12 + genome.turbulence * 0.4;
+    const decay = 0.68 + (1 - genome.turbulence) * 0.12;
+    let processed = 0;
+    const budget = Math.round(3e3 + genome.density * 22e3);
+    const tips = [];
+    let head = 0;
+    while (head < branches.length && processed < budget) {
+      const branch = branches[head];
+      head += 1;
+      processed += 1;
+      if (branch.energy < unit * 8e-3 || branch.generation > 11) {
+        tips.push([branch.x, branch.y, branch.thickness]);
+        continue;
+      }
+      const segmentLength = branch.energy * rng.range(0.4, 0.7);
+      let x = branch.x;
+      let y = branch.y;
+      let angle = branch.angle;
+      ctx.strokeStyle = branch.generation > 6 && rng.next() > 0.85 ? palette.accent : palette.marks[Math.min(palette.marks.length - 1, branch.generation % palette.marks.length)];
+      ctx.globalAlpha = 0.35 + rng.next() * 0.5;
+      ctx.lineWidth = Math.max(0.4, branch.thickness);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      const steps = 8;
+      for (let s = 0; s < steps; s += 1) {
+        angle += (noise(x * 3e-3, y * 3e-3) - 0.5) * wander;
+        x += Math.cos(angle) * (segmentLength / steps);
+        y += Math.sin(angle) * (segmentLength / steps);
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      if (x < -unit * 0.1 || x > width + unit * 0.1 || y < -unit * 0.1 || y > height + unit * 0.1) {
+        continue;
+      }
+      const childCount = rng.next() < 0.12 + genome.density * 0.25 ? 3 : 2;
+      for (let c = 0; c < childCount; c += 1) {
+        const spread = (c - (childCount - 1) / 2) * splitAngle;
+        branches.push({
+          x,
+          y,
+          angle: angle + spread + rng.gaussian(0, 0.1),
+          energy: branch.energy * decay * rng.range(0.8, 1.1),
+          thickness: branch.thickness * rng.range(0.6, 0.82),
+          generation: branch.generation + 1
+        });
+      }
+      if (processed % 60 === 0) yield Math.min(0.85, processed / budget);
+    }
+    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
+    for (let i = 0; i < tips.length; i += 1) {
+      const tip = tips[i];
+      const size = Math.max(0.6, tip[2] * rng.range(1.2, 3.6));
+      ctx.fillStyle = rng.next() > 0.8 ? palette.accent : palette.marks[palette.marks.length - 1];
+      ctx.globalAlpha = 0.3 + rng.next() * 0.5;
+      ctx.beginPath();
+      ctx.arc(tip[0], tip[1], size, 0, Math.PI * 2);
+      ctx.fill();
+      if (i % 120 === 0) yield 0.85 + i / Math.max(1, tips.length) * 0.15;
+    }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+  };
+
+  // src/art/renderer.ts
+  var SYSTEMS = {
+    current,
+    radiance,
+    strata,
+    fracture,
+    constellation,
+    lattice,
+    growth
+  };
+  function layGround(env) {
+    const { ctx, width, height, palette, genome } = env;
+    ctx.fillStyle = palette.ground;
+    ctx.fillRect(0, 0, width, height);
+    const angle = genome.baseHue * (Math.PI / 180);
+    const wash = ctx.createLinearGradient(
+      width / 2 - Math.cos(angle) * width * 0.6,
+      height / 2 - Math.sin(angle) * height * 0.6,
+      width / 2 + Math.cos(angle) * width * 0.6,
+      height / 2 + Math.sin(angle) * height * 0.6
+    );
+    wash.addColorStop(0, palette.marks[0] ?? palette.veil);
+    wash.addColorStop(1, palette.ground);
+    ctx.globalAlpha = 0.16 + genome.arousal * 0.1;
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1;
+  }
+  function applyFinish(env) {
+    const { ctx, width, height, genome, palette, rng } = env;
+    const vignette = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.25,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.78
+    );
+    vignette.addColorStop(0, "hsl(0 0% 0% / 0)");
+    vignette.addColorStop(1, palette.nocturne ? "hsl(0 0% 0% / 0.55)" : "hsl(0 0% 12% / 0.24)");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+    const strength = genome.grain;
+    if (strength <= 0.02) return;
+    const image = ctx.getImageData(0, 0, width, height);
+    const data = image.data;
+    const amount = strength * 26;
+    for (let i = 0; i < data.length; i += 4) {
+      const n = (rng.next() - 0.5) * amount;
+      data[i] = Math.max(0, Math.min(255, data[i] + n));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + n));
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+  function render(canvas, genome, options) {
+    const { width, height } = options;
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("Canvas 2D context unavailable in this browser.");
+    const rng = makeRng(genome.seed);
+    const palette = buildPalette({
+      baseHue: genome.baseHue,
+      harmony: genome.harmony,
+      valence: genome.valence,
+      arousal: genome.arousal,
+      forceNocturne: genome.forceNocturne,
+      rng
+    });
+    const env = {
+      ctx,
+      width,
+      height,
+      unit: Math.min(width, height),
+      palette,
+      genome,
+      rng,
+      noise: makeNoise2D(genome.seed ^ 1542469173)
+    };
+    layGround(env);
+    const iterator = SYSTEMS[genome.system](env);
+    let cancelled = false;
+    let frame = 0;
+    const done = new Promise((resolve) => {
+      const step = () => {
+        if (cancelled) return;
+        const deadline = performance.now() + 12;
+        let result = iterator.next();
+        while (!result.done && performance.now() < deadline) {
+          result = iterator.next();
+        }
+        options.onProgress?.(result.done ? 1 : Math.min(0.99, result.value || 0));
+        if (result.done) {
+          applyFinish(env);
+          options.onProgress?.(1);
+          resolve();
+          return;
+        }
+        frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    });
+    return {
+      done,
+      cancel: () => {
+        cancelled = true;
+        cancelAnimationFrame(frame);
+      }
+    };
+  }
+
+  // src/ui/app.ts
+  var FORMATS = {
+    portrait: { width: 1400, height: 1750, label: "4:5" },
+    square: { width: 1600, height: 1600, label: "1:1" },
+    landscape: { width: 1920, height: 1280, label: "3:2" },
+    poster: { width: 1400, height: 2100, label: "2:3" }
+  };
+  function must(id) {
+    const element = document.getElementById(id);
+    if (!element) throw new Error(`Missing element #${id}`);
+    return element;
+  }
+  function mountApp() {
+    const form = must("intake-form");
+    const urlInput = must("url-input");
+    const interpretButton = must("interpret-button");
+    const statusEl = must("status");
+    const fallback = must("fallback");
+    const lyricsInput = must("lyrics-input");
+    const readPasted = must("read-pasted");
+    const readingEl = must("reading");
+    const nowReading = must("now-reading");
+    const verdictEl = must("verdict");
+    const systemName = must("system-name");
+    const systemDescription = must("system-description");
+    const notesEl = must("notes");
+    const themesEl = must("themes");
+    const metricsEl = must("metrics");
+    const signatureEl = must("signature");
+    const canvas = must("canvas");
+    const frameEmpty = must("frame-empty");
+    const progress = must("progress");
+    const progressBar = must("progress-bar");
+    const revariate = must("revariate");
+    const download = must("download");
+    const formatSelect = must("format");
+    const plate = must("plate");
+    let subject = null;
+    let activeRender = null;
+    let inFlight = null;
+    function setStatus(message, tone = "idle") {
+      statusEl.textContent = message;
+      statusEl.classList.toggle("working", tone === "working");
+      statusEl.classList.toggle("error", tone === "error");
+    }
+    function setBusy(busy) {
+      interpretButton.disabled = busy;
+      readPasted.disabled = busy;
+      interpretButton.textContent = busy ? "Reading\u2026" : "Interpret";
+    }
+    function renderThemes(analysis) {
+      themesEl.replaceChildren();
+      const visible = analysis.themes.filter((t) => t.strength > 0.06).slice(0, 6);
+      if (visible.length === 0) {
+        const li = document.createElement("li");
+        li.className = "theme-hits";
+        li.textContent = "No thematic field registered strongly enough to name.";
+        themesEl.append(li);
+        return;
+      }
+      visible.forEach((theme, index) => {
+        const li = document.createElement("li");
+        li.className = index === 0 ? "theme-row" : "theme-row is-secondary";
+        const head = document.createElement("div");
+        head.className = "theme-head";
+        const name = document.createElement("span");
+        name.className = "theme-name";
+        name.textContent = theme.label;
+        const value = document.createElement("span");
+        value.className = "theme-value";
+        value.textContent = `${Math.round(theme.strength * 100)}`;
+        head.append(name, value);
+        const track = document.createElement("div");
+        track.className = "theme-track";
+        const fill = document.createElement("span");
+        fill.className = "theme-fill";
+        fill.style.width = `${Math.round(theme.strength * 100)}%`;
+        track.append(fill);
+        li.append(head, track);
+        if (theme.hits.length > 0) {
+          const hits = document.createElement("div");
+          hits.className = "theme-hits";
+          hits.textContent = theme.hits.slice(0, 6).join(" \xB7 ");
+          li.append(hits);
+        }
+        themesEl.append(li);
+      });
+    }
+    function renderMetrics(analysis, genome) {
+      const entries = [
+        ["Valence", analysis.valence.toFixed(2), analysis.valence >= 0 ? "warm" : "dark"],
+        ["Energy", analysis.arousal.toFixed(2)],
+        ["Repetition", `${Math.round(analysis.repetition * 100)}%`],
+        ["Vocabulary", `${Math.round(analysis.diversity * 100)}%`],
+        ["Rhyme", `${Math.round(analysis.rhyme * 100)}%`],
+        ["Words", String(analysis.wordCount)],
+        ["Lines", String(analysis.lineCount)],
+        ["Hue", `${Math.round(genome.baseHue)}\xB0`]
+      ];
+      metricsEl.replaceChildren();
+      for (const [label, value, suffix] of entries) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "metric";
+        const dt = document.createElement("dt");
+        dt.textContent = label;
+        const dd = document.createElement("dd");
+        dd.textContent = value;
+        if (suffix) {
+          const note = document.createElement("span");
+          note.textContent = suffix;
+          dd.append(note);
+        }
+        wrapper.append(dt, dd);
+        metricsEl.append(wrapper);
+      }
+    }
+    function renderReading(analysis, genome, current2) {
+      const reading = explain(analysis, genome);
+      nowReading.replaceChildren();
+      const label = document.createElement("strong");
+      label.textContent = current2.title;
+      nowReading.append(label);
+      if (current2.attribution) {
+        nowReading.append(document.createTextNode(` \u2014 ${current2.attribution}`));
+      }
+      nowReading.append(document.createElement("br"));
+      nowReading.append(document.createTextNode(current2.sourceLabel));
+      verdictEl.textContent = reading.verdict;
+      systemName.textContent = reading.systemLabel;
+      systemDescription.textContent = reading.systemDescription;
+      notesEl.replaceChildren();
+      for (const note of reading.notes) {
+        const li = document.createElement("li");
+        li.textContent = note;
+        notesEl.append(li);
+      }
+      renderThemes(analysis);
+      renderMetrics(analysis, genome);
+      signatureEl.replaceChildren();
+      for (const { word, count } of analysis.signature) {
+        const li = document.createElement("li");
+        li.textContent = word;
+        const b = document.createElement("b");
+        b.textContent = String(count);
+        li.append(b);
+        signatureEl.append(li);
+      }
+      readingEl.hidden = false;
+    }
+    function paint() {
+      if (!subject) return;
+      activeRender?.cancel();
+      const genome = interpret(subject.analysis, subject.variation);
+      const format = FORMATS[formatSelect.value] ?? FORMATS.portrait;
+      renderReading(subject.analysis, genome, subject);
+      frameEmpty.hidden = true;
+      progress.hidden = false;
+      progressBar.style.width = "0%";
+      canvas.classList.remove("is-visible");
+      revariate.disabled = true;
+      download.disabled = true;
+      plate.replaceChildren();
+      const plateTitle = document.createElement("strong");
+      plateTitle.textContent = subject.title;
+      plate.append(plateTitle);
+      plate.append(
+        document.createTextNode(
+          ` \xB7 ${genome.system} \xB7 ${format.label} \xB7 seed ${genome.seed.toString(16)}` + (subject.variation > 0 ? ` \xB7 var ${subject.variation}` : "")
+        )
+      );
+      activeRender = render(canvas, genome, {
+        width: format.width,
+        height: format.height,
+        onProgress: (p) => {
+          progressBar.style.width = `${Math.round(p * 100)}%`;
+        }
+      });
+      canvas.classList.add("is-visible");
+      void activeRender.done.then(() => {
+        progress.hidden = true;
+        revariate.disabled = false;
+        download.disabled = false;
+      });
+    }
+    function readLyrics(text, descriptor) {
+      const analysis = analyze(text);
+      if (analysis.wordCount < 20) {
+        setStatus(
+          "That is too little text to interpret \u2014 the machine needs a full lyric sheet to measure.",
+          "error"
+        );
+        return false;
+      }
+      subject = { ...descriptor, analysis, variation: 0 };
+      paint();
+      return true;
+    }
+    function describeSource(lyrics, guess) {
+      if (lyrics.source === "pasted") return "Read from pasted text";
+      const matched = lyrics.matchedTrack && lyrics.matchedArtist ? `${lyrics.matchedTrack} \u2014 ${lyrics.matchedArtist}` : guess ? `${guess.track}${guess.artist ? ` \u2014 ${guess.artist}` : ""}` : "match";
+      return `Matched \u201C${matched}\u201D via ${lyrics.source}`;
+    }
+    function titleFor(meta, guess, lyrics) {
+      if (lyrics.matchedTrack) return lyrics.matchedTrack;
+      if (guess?.track) return guess.track;
+      if (meta?.title) return meta.title;
+      return "Untitled";
+    }
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const value = urlInput.value.trim();
+      if (!value) {
+        setStatus("Paste a YouTube link first.", "error");
+        return;
+      }
+      inFlight?.abort();
+      const controller = new AbortController();
+      inFlight = controller;
+      setBusy(true);
+      setStatus("Reading the video\u2026", "working");
+      void acquire(value, {
+        signal: controller.signal,
+        onStatus: (message) => setStatus(message, "working")
+      }).then((outcome) => {
+        if (controller.signal.aborted) return;
+        if (!outcome.ok) {
+          setStatus(outcome.reason, "error");
+          fallback.open = true;
+          if (outcome.guess?.track) {
+            lyricsInput.placeholder = `Paste the lyrics to \u201C${outcome.guess.track}\u201D here\u2026`;
+          }
+          return;
+        }
+        const ok = readLyrics(outcome.lyrics.text, {
+          title: titleFor(outcome.meta, outcome.guess, outcome.lyrics),
+          attribution: outcome.lyrics.matchedArtist ?? outcome.guess?.artist ?? "",
+          sourceLabel: describeSource(outcome.lyrics, outcome.guess)
+        });
+        if (ok) setStatus("Interpretation complete.");
+      }).catch(() => {
+        if (!controller.signal.aborted) {
+          setStatus("Something went wrong reaching the lyric services. Try pasting the words instead.", "error");
+          fallback.open = true;
+        }
+      }).finally(() => {
+        if (inFlight === controller) {
+          inFlight = null;
+          setBusy(false);
+        }
+      });
+    });
+    readPasted.addEventListener("click", () => {
+      const text = lyricsInput.value.trim();
+      if (!text) {
+        setStatus("Paste some lyrics first.", "error");
+        return;
+      }
+      const ref = urlInput.value.trim();
+      const ok = readLyrics(text, {
+        title: ref ? "Pasted lyrics" : "Untitled",
+        attribution: "",
+        sourceLabel: "Read from pasted text"
+      });
+      if (ok) setStatus("Interpretation complete.");
+    });
+    revariate.addEventListener("click", () => {
+      if (!subject) return;
+      subject.variation += 1;
+      paint();
+    });
+    formatSelect.addEventListener("change", () => {
+      if (subject) paint();
+    });
+    download.addEventListener("click", () => {
+      if (!subject) return;
+      const safeName = subject.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "interpretation";
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          setStatus("The browser would not export this canvas.", "error");
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${safeName}-${subject?.variation ?? 0}.png`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1e3);
+      }, "image/png");
+    });
+  }
+
+  // <stdin>
+  mountApp();
+})();
+
+    </script>
+  </body>
+</html>
