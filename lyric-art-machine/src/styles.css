@@ -691,3 +691,36 @@ button:disabled {
   max-width: 74ch;
   line-height: 1.65;
 }
+
+/* ---------- style card additions ---------- */
+
+.treatment-line {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.55;
+}
+
+.treatment-name {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.treatment-name::after {
+  content: ' — ';
+  color: var(--ink-faint);
+}
+
+.plot-flag {
+  margin: 9px 0 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+.plot-flag.is-plottable {
+  color: #7fb27a;
+}

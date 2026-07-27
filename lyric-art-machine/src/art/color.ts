@@ -53,6 +53,9 @@ export interface PaletteInput {
   forceNocturne?: boolean;
   /** 0..1 spectral brightness from the audio. 0.5 is neutral / unheard. */
   brightness?: number;
+  /** Treatment ground override, e.g. blueprint's deep blue. */
+  lightnessShift?: number;
+  saturationShift?: number;
   rng: Rng;
 }
 
@@ -65,14 +68,18 @@ export function buildPalette(input: PaletteInput): Palette {
 
   // Bleak songs get dark grounds; radiant ones get paper. The threshold sits
   // slightly below neutral so ambiguous songs lean dark, which simply looks better.
-  const nocturne = input.forceNocturne ?? valence < 0.08;
+  const lightnessShift = input.lightnessShift ?? 0;
+  // A treatment that darkens the ground implies a dark picture, whatever the
+  // lyrics felt like.
+  const nocturne = lightnessShift < -20 ? true : input.forceNocturne ?? valence < 0.08;
 
-  const saturation = 28 + arousal * 46 + Math.abs(valence) * 12;
+  const saturation = 28 + arousal * 46 + Math.abs(valence) * 12 + (input.saturationShift ?? 0);
   const offsets = HARMONY_OFFSETS[harmony];
 
-  const groundLightness = nocturne
+  const groundLightness = (nocturne
     ? 6 + Math.max(0, valence) * 6 + rng.range(0, 3)
-    : 91 - Math.max(0, -valence) * 8 + rng.range(-2, 2);
+    : 91 - Math.max(0, -valence) * 8 + rng.range(-2, 2))
+    + (lightnessShift < -20 ? Math.max(-6, lightnessShift + 26) : lightnessShift);
 
   const ground = hsl(
     baseHue + rng.range(-12, 12),

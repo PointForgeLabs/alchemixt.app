@@ -710,6 +710,39 @@ button:disabled {
   line-height: 1.65;
 }
 
+/* ---------- style card additions ---------- */
+
+.treatment-line {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-dim);
+  line-height: 1.55;
+}
+
+.treatment-name {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.treatment-name::after {
+  content: ' — ';
+  color: var(--ink-faint);
+}
+
+.plot-flag {
+  margin: 9px 0 0;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+.plot-flag.is-plottable {
+  color: #7fb27a;
+}
+
     </style>
   </head>
   <body>
@@ -785,9 +818,14 @@ button:disabled {
             <h2 class="verdict" id="verdict"></h2>
 
             <div class="system-card">
-              <span class="system-eyebrow">Visual system</span>
+              <span class="system-eyebrow">Style</span>
               <strong class="system-name" id="system-name"></strong>
               <p class="system-description" id="system-description"></p>
+              <p class="treatment-line">
+                <span class="treatment-name" id="treatment-name"></span>
+                <span class="treatment-description" id="treatment-description"></span>
+              </p>
+              <p class="plot-flag" id="plot-flag"></p>
             </div>
 
             <section class="reading-block" id="heard-block" hidden>
@@ -830,6 +868,12 @@ button:disabled {
           </div>
 
           <div class="gallery-controls">
+            <label class="select-field">
+              <span>Style</span>
+              <select id="style-select" disabled>
+                <option value="">Machine's choice</option>
+              </select>
+            </label>
             <button type="button" class="secondary" id="revariate" disabled>New variation</button>
             <label class="select-field">
               <span>Format</span>
@@ -2233,51 +2277,1598 @@ button:disabled {
     };
   }
 
-  // src/analysis/interpret.ts
-  var SYSTEM_BY_THEME = {
-    motion: "current",
-    water: "current",
-    transcendence: "radiance",
-    fire: "radiance",
-    love: "radiance",
-    memory: "strata",
-    loss: "strata",
-    defiance: "fracture",
-    night: "constellation",
-    city: "lattice",
-    nature: "growth",
-    body: "growth"
-  };
-  var SYSTEM_INFO = {
-    current: {
-      label: "Current",
-      description: "Thousands of particles released into a noise field, each tracing where the song pushes it. Nothing is placed; everything is carried."
-    },
-    radiance: {
-      label: "Radiance",
-      description: "Everything organized around a single luminous center \u2014 rays, arcs, and orbits that either resolve into a halo or burn out at the edges."
-    },
-    strata: {
-      label: "Strata",
-      description: "The image laid down in horizontal bands, like sediment or a stack of exposures. Older layers show through the newer ones."
-    },
-    fracture: {
-      label: "Fracture",
-      description: "The picture plane broken into shards and driven apart along hard diagonals. Each fragment keeps a piece of the original field."
-    },
-    constellation: {
-      label: "Constellation",
-      description: "Points of light scattered across a dark ground, with faint lines drawn between the ones that belong together."
-    },
-    lattice: {
-      label: "Lattice",
-      description: "A rigid grid imposed on the canvas, then made to carry something it was not built for. The structure holds, but not evenly."
-    },
-    growth: {
-      label: "Growth",
-      description: "Branching forms grown from seed points, splitting and thinning until they run out of energy."
+  // src/art/catalog.ts
+  var STYLES = [
+    // ---- current -------------------------------------------------------------
+    { key: "riverrun", name: "Riverrun", engine: "current", treatment: "ink", themes: ["water", "motion"], energy: 0.5, grit: 0.3 },
+    { key: "undertow", name: "Undertow", engine: "current", treatment: "wash", themes: ["water", "loss"], energy: 0.3, grit: 0.2, bias: { density: 0.8 } },
+    { key: "slipstream", name: "Slipstream", engine: "current", treatment: "neon", themes: ["motion", "city"], energy: 0.8, grit: 0.5 },
+    { key: "silt", name: "Silt", engine: "current", treatment: "engrave", themes: ["water", "memory"], energy: 0.35, grit: 0.4 },
+    { key: "crosswind", name: "Crosswind", engine: "current", treatment: "sketch", themes: ["motion", "nature"], energy: 0.55, grit: 0.5 },
+    { key: "tidewrack", name: "Tidewrack", engine: "current", treatment: "riso", themes: ["water", "motion"], energy: 0.6, grit: 0.55 },
+    // ---- terrain -------------------------------------------------------------
+    { key: "contour", name: "Contour", engine: "terrain", treatment: "ink", themes: ["nature", "memory"], energy: 0.35, grit: 0.25 },
+    { key: "survey", name: "Survey", engine: "terrain", treatment: "blueprint", themes: ["nature", "city"], energy: 0.4, grit: 0.3 },
+    { key: "seabed", name: "Seabed", engine: "terrain", treatment: "engrave", themes: ["water", "memory"], energy: 0.3, grit: 0.35 },
+    { key: "ridgeline", name: "Ridgeline", engine: "terrain", treatment: "woodcut", themes: ["nature", "defiance"], energy: 0.6, grit: 0.7 },
+    { key: "lowland", name: "Lowland", engine: "terrain", treatment: "wash", themes: ["nature", "loss"], energy: 0.25, grit: 0.2 },
+    // ---- swarm ---------------------------------------------------------------
+    { key: "murmuration", name: "Murmuration", engine: "swarm", treatment: "ink", themes: ["nature", "motion"], energy: 0.55, grit: 0.35 },
+    { key: "hivemind", name: "Hivemind", engine: "swarm", treatment: "stipple", themes: ["city", "body"], energy: 0.5, grit: 0.45 },
+    { key: "panic", name: "Panic", engine: "swarm", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.85, grit: 0.7, bias: { turbulence: 1.3 } },
+    { key: "shoal", name: "Shoal", engine: "swarm", treatment: "riso", themes: ["water", "nature"], energy: 0.45, grit: 0.4 },
+    // ---- columns -------------------------------------------------------------
+    { key: "downpour", name: "Downpour", engine: "columns", treatment: "ink", themes: ["water", "loss"], energy: 0.5, grit: 0.35 },
+    { key: "curtainfall", name: "Curtainfall", engine: "columns", treatment: "wash", themes: ["loss", "night"], energy: 0.3, grit: 0.2 },
+    { key: "ticker", name: "Ticker", engine: "columns", treatment: "neon", themes: ["city", "motion"], energy: 0.75, grit: 0.5 },
+    { key: "reeds", name: "Reeds", engine: "columns", treatment: "engrave", themes: ["nature", "water"], energy: 0.3, grit: 0.3 },
+    { key: "staticfall", name: "Static Fall", engine: "columns", treatment: "halftone", themes: ["city", "night"], energy: 0.65, grit: 0.75 },
+    // ---- radiance ------------------------------------------------------------
+    { key: "monstrance", name: "Monstrance", engine: "radiance", treatment: "ink", themes: ["transcendence", "fire"], energy: 0.55, grit: 0.3 },
+    { key: "annunciation", name: "Annunciation", engine: "radiance", treatment: "engrave", themes: ["transcendence", "love"], energy: 0.45, grit: 0.3 },
+    { key: "corona", name: "Corona", engine: "radiance", treatment: "neon", themes: ["fire", "transcendence"], energy: 0.85, grit: 0.5 },
+    { key: "reliquary", name: "Reliquary", engine: "radiance", treatment: "woodcut", themes: ["transcendence", "defiance"], energy: 0.7, grit: 0.8 },
+    { key: "aureole", name: "Aureole", engine: "radiance", treatment: "wash", themes: ["love", "transcendence"], energy: 0.35, grit: 0.2 },
+    { key: "sunprint", name: "Sunprint", engine: "radiance", treatment: "screenprint", themes: ["fire", "love"], energy: 0.7, grit: 0.5 },
+    // ---- spiral --------------------------------------------------------------
+    { key: "obsession", name: "Obsession", engine: "spiral", treatment: "ink", themes: ["love", "memory"], energy: 0.5, grit: 0.3 },
+    { key: "vertigo", name: "Vertigo", engine: "spiral", treatment: "sketch", themes: ["night", "body"], energy: 0.6, grit: 0.55 },
+    { key: "groove", name: "Groove", engine: "spiral", treatment: "engrave", themes: ["memory", "city"], energy: 0.45, grit: 0.35 },
+    { key: "whirlpool", name: "Whirlpool", engine: "spiral", treatment: "neon", themes: ["water", "night"], energy: 0.75, grit: 0.45 },
+    // ---- orbits --------------------------------------------------------------
+    { key: "orrery", name: "Orrery", engine: "orbits", treatment: "ink", themes: ["transcendence", "night"], energy: 0.4, grit: 0.25 },
+    { key: "ephemeris", name: "Ephemeris", engine: "orbits", treatment: "blueprint", themes: ["night", "memory"], energy: 0.35, grit: 0.3 },
+    { key: "resonance", name: "Resonance", engine: "orbits", treatment: "neon", themes: ["transcendence", "city"], energy: 0.8, grit: 0.45 },
+    { key: "spirograph", name: "Spirograph", engine: "orbits", treatment: "riso", themes: ["love", "motion"], energy: 0.55, grit: 0.45 },
+    // ---- bloom ---------------------------------------------------------------
+    { key: "roe", name: "Roe", engine: "bloom", treatment: "ink", themes: ["body", "nature"], energy: 0.45, grit: 0.3 },
+    { key: "culture", name: "Culture", engine: "bloom", treatment: "stipple", themes: ["body", "nature"], energy: 0.4, grit: 0.4 },
+    { key: "foam", name: "Foam", engine: "bloom", treatment: "wash", themes: ["water", "love"], energy: 0.3, grit: 0.2 },
+    { key: "cobble", name: "Cobble", engine: "bloom", treatment: "woodcut", themes: ["city", "nature"], energy: 0.6, grit: 0.75 },
+    // ---- strata --------------------------------------------------------------
+    { key: "sediment", name: "Sediment", engine: "strata", treatment: "ink", themes: ["memory", "loss"], energy: 0.35, grit: 0.3 },
+    { key: "corestack", name: "Core Sample", engine: "strata", treatment: "hatch", themes: ["memory", "nature"], energy: 0.4, grit: 0.4 },
+    { key: "exposure", name: "Exposure", engine: "strata", treatment: "riso", themes: ["memory", "love"], energy: 0.5, grit: 0.5 },
+    { key: "horizonband", name: "Horizon Band", engine: "strata", treatment: "screenprint", themes: ["loss", "memory"], energy: 0.55, grit: 0.5 },
+    { key: "seam", name: "Seam", engine: "strata", treatment: "engrave", themes: ["loss", "city"], energy: 0.35, grit: 0.35 },
+    // ---- weave ---------------------------------------------------------------
+    { key: "warpweft", name: "Warp & Weft", engine: "weave", treatment: "ink", themes: ["memory", "body"], energy: 0.4, grit: 0.3 },
+    { key: "sackcloth", name: "Sackcloth", engine: "weave", treatment: "woodcut", themes: ["loss", "defiance"], energy: 0.6, grit: 0.75 },
+    { key: "tartan", name: "Tartan", engine: "weave", treatment: "riso", themes: ["memory", "love"], energy: 0.5, grit: 0.45 },
+    { key: "gauze", name: "Gauze", engine: "weave", treatment: "wash", themes: ["love", "night"], energy: 0.25, grit: 0.2 },
+    // ---- moire ---------------------------------------------------------------
+    { key: "interference", name: "Interference", engine: "moire", treatment: "ink", themes: ["city", "night"], energy: 0.55, grit: 0.4 },
+    { key: "beatfrequency", name: "Beat Frequency", engine: "moire", treatment: "neon", themes: ["city", "motion"], energy: 0.85, grit: 0.5 },
+    { key: "gridlock", name: "Gridlock", engine: "moire", treatment: "blueprint", themes: ["city", "defiance"], energy: 0.5, grit: 0.4 },
+    // ---- fracture ------------------------------------------------------------
+    { key: "faultline", name: "Fault Line", engine: "fracture", treatment: "ink", themes: ["defiance", "loss"], energy: 0.75, grit: 0.5 },
+    { key: "blockcut", name: "Block Cut", engine: "fracture", treatment: "woodcut", themes: ["defiance", "fire"], energy: 0.9, grit: 0.85 },
+    { key: "shardprint", name: "Shard Print", engine: "fracture", treatment: "screenprint", themes: ["defiance", "city"], energy: 0.8, grit: 0.6 },
+    { key: "cleave", name: "Cleave", engine: "fracture", treatment: "hatch", themes: ["defiance", "body"], energy: 0.7, grit: 0.55 },
+    // ---- shatter -------------------------------------------------------------
+    { key: "impact", name: "Impact", engine: "shatter", treatment: "ink", themes: ["defiance", "fire"], energy: 0.85, grit: 0.6 },
+    { key: "windscreen", name: "Windscreen", engine: "shatter", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.8, grit: 0.7 },
+    { key: "starburst", name: "Starburst", engine: "shatter", treatment: "neon", themes: ["fire", "night"], energy: 0.9, grit: 0.55 },
+    // ---- lattice -------------------------------------------------------------
+    { key: "tenement", name: "Tenement", engine: "lattice", treatment: "ink", themes: ["city", "memory"], energy: 0.55, grit: 0.4 },
+    { key: "schematic", name: "Schematic", engine: "lattice", treatment: "blueprint", themes: ["city", "transcendence"], energy: 0.45, grit: 0.35 },
+    { key: "circuitboard", name: "Circuit Board", engine: "lattice", treatment: "neon", themes: ["city", "motion"], energy: 0.8, grit: 0.5 },
+    { key: "newsprint", name: "Newsprint", engine: "lattice", treatment: "halftone", themes: ["city", "loss"], energy: 0.6, grit: 0.7 },
+    { key: "quarter", name: "Quarter", engine: "lattice", treatment: "engrave", themes: ["city", "memory"], energy: 0.45, grit: 0.4 },
+    // ---- growth --------------------------------------------------------------
+    { key: "thicket", name: "Thicket", engine: "growth", treatment: "ink", themes: ["nature", "body"], energy: 0.5, grit: 0.35 },
+    { key: "herbarium", name: "Herbarium", engine: "growth", treatment: "engrave", themes: ["nature", "memory"], energy: 0.35, grit: 0.3 },
+    { key: "nerve", name: "Nerve", engine: "growth", treatment: "neon", themes: ["body", "night"], energy: 0.75, grit: 0.5 },
+    { key: "bramble", name: "Bramble", engine: "growth", treatment: "sketch", themes: ["nature", "defiance"], energy: 0.6, grit: 0.6 },
+    { key: "rootstock", name: "Rootstock", engine: "growth", treatment: "woodcut", themes: ["nature", "loss"], energy: 0.65, grit: 0.8 },
+    // ---- constellation -------------------------------------------------------
+    { key: "starchart", name: "Star Chart", engine: "constellation", treatment: "ink", themes: ["night", "transcendence"], energy: 0.3, grit: 0.25 },
+    { key: "planisphere", name: "Planisphere", engine: "constellation", treatment: "blueprint", themes: ["night", "memory"], energy: 0.3, grit: 0.3 },
+    { key: "deepfield", name: "Deep Field", engine: "constellation", treatment: "neon", themes: ["night", "transcendence"], energy: 0.5, grit: 0.35 },
+    { key: "nightgarden", name: "Night Garden", engine: "constellation", treatment: "stipple", themes: ["night", "nature"], energy: 0.35, grit: 0.4 },
+    // ---- drift ---------------------------------------------------------------
+    { key: "ashfall", name: "Ashfall", engine: "drift", treatment: "ink", themes: ["loss", "fire"], energy: 0.45, grit: 0.5 },
+    { key: "snowblind", name: "Snowblind", engine: "drift", treatment: "stipple", themes: ["loss", "night"], energy: 0.3, grit: 0.4 },
+    { key: "interferencefield", name: "Signal Loss", engine: "drift", treatment: "halftone", themes: ["city", "loss"], energy: 0.6, grit: 0.8 },
+    { key: "pollen", name: "Pollen", engine: "drift", treatment: "wash", themes: ["nature", "love"], energy: 0.3, grit: 0.25 },
+    { key: "chaff", name: "Chaff", engine: "drift", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.7, grit: 0.65 }
+  ];
+  var STYLE_BY_KEY = new Map(STYLES.map((s) => [s.key, s]));
+  function chooseStyle(themes, energy, grit, seed) {
+    const strengthByTheme = /* @__PURE__ */ new Map();
+    for (const theme of themes) strengthByTheme.set(theme.key, theme.strength);
+    let best = STYLES[0];
+    let bestScore = -Infinity;
+    for (let i = 0; i < STYLES.length; i += 1) {
+      const style = STYLES[i];
+      let themeScore = 0;
+      style.themes.forEach((key, index) => {
+        const weight = index === 0 ? 1 : 0.55;
+        themeScore += (strengthByTheme.get(key) ?? 0) * weight;
+      });
+      const energyScore = 1 - Math.abs(style.energy - energy);
+      const gritScore = 1 - Math.abs(style.grit - grit);
+      const jitter = ((seed ^ Math.imul(i + 1, 2654435769)) >>> 0) / 4294967295 * 0.18;
+      const score = themeScore * 2.4 + energyScore * 0.8 + gritScore * 0.5 + jitter;
+      if (score > bestScore) {
+        bestScore = score;
+        best = style;
+      }
     }
-  };
+    return best;
+  }
+
+  // src/art/geometry.ts
+  function createScene() {
+    return { marks: [], glows: [] };
+  }
+  function mark(points, options = {}) {
+    return {
+      points,
+      closed: options.closed ?? false,
+      fill: options.fill ?? false,
+      tone: options.tone ?? 0.5,
+      weight: options.weight ?? 1,
+      alpha: options.alpha ?? 1,
+      accent: options.accent ?? false,
+      layer: options.layer ?? 0
+    };
+  }
+  function push(scene, points, options = {}) {
+    if (points.length < 2) return;
+    scene.marks.push(mark(points, options));
+  }
+  function circlePoints(cx, cy, r, segments = 48) {
+    const points = [];
+    for (let i = 0; i < segments; i += 1) {
+      const a = i / segments * Math.PI * 2;
+      points.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+    return points;
+  }
+  function arcPoints(cx, cy, r, start, sweep, segments = 40) {
+    const points = [];
+    for (let i = 0; i <= segments; i += 1) {
+      const a = start + i / segments * sweep;
+      points.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+    return points;
+  }
+  function rectPoints(x, y, w, h) {
+    return [
+      [x, y],
+      [x + w, y],
+      [x + w, y + h],
+      [x, y + h]
+    ];
+  }
+  function centroid(points) {
+    let x = 0;
+    let y = 0;
+    for (const p of points) {
+      x += p[0];
+      y += p[1];
+    }
+    return [x / points.length, y / points.length];
+  }
+  function boundsOf(points) {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [x, y] of points) {
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    return { minX, minY, maxX, maxY };
+  }
+  function hatchPolygon(polygon, angle, spacing) {
+    if (polygon.length < 3 || spacing <= 0) return [];
+    const cos = Math.cos(-angle);
+    const sin = Math.sin(-angle);
+    const rotated = polygon.map(([x, y]) => [x * cos - y * sin, x * sin + y * cos]);
+    const { minY, maxY } = boundsOf(rotated);
+    const lines = [];
+    const backCos = Math.cos(angle);
+    const backSin = Math.sin(angle);
+    const maxLines = 4e3;
+    let emitted = 0;
+    for (let y = minY + spacing * 0.5; y < maxY && emitted < maxLines; y += spacing) {
+      const crossings = [];
+      for (let i = 0; i < rotated.length; i += 1) {
+        const a = rotated[i];
+        const b = rotated[(i + 1) % rotated.length];
+        const ay = a[1];
+        const by = b[1];
+        if (ay === by) continue;
+        if (y >= ay && y < by || y >= by && y < ay) {
+          const t = (y - ay) / (by - ay);
+          crossings.push(a[0] + (b[0] - a[0]) * t);
+        }
+      }
+      if (crossings.length < 2) continue;
+      crossings.sort((p, q) => p - q);
+      for (let i = 0; i + 1 < crossings.length; i += 2) {
+        const x1 = crossings[i];
+        const x2 = crossings[i + 1];
+        if (x2 - x1 < 1e-6) continue;
+        lines.push([
+          [x1 * backCos - y * backSin, x1 * backSin + y * backCos],
+          [x2 * backCos - y * backSin, x2 * backSin + y * backCos]
+        ]);
+        emitted += 1;
+      }
+    }
+    return lines;
+  }
+  function pointInPolygon(point, polygon) {
+    const [px, py] = point;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
+      const a = polygon[i];
+      const b = polygon[j];
+      if (a[1] > py !== b[1] > py) {
+        const x = (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0];
+        if (px < x) inside = !inside;
+      }
+    }
+    return inside;
+  }
+  function jitterPoints(points, amount, noise, phase = 0) {
+    if (amount <= 0) return points;
+    return points.map(([x, y]) => {
+      const nx = noise(x * 0.01 + phase, y * 0.01) - 0.5;
+      const ny = noise(x * 0.01, y * 0.01 + phase + 31.7) - 0.5;
+      return [x + nx * amount, y + ny * amount];
+    });
+  }
+
+  // src/art/engines/broken.ts
+  function splitShard(shard, angle, bias) {
+    const pts = shard.points;
+    const [cx, cy] = centroid(pts);
+    const nx = Math.cos(angle);
+    const ny = Math.sin(angle);
+    const side = (p) => (p[0] - cx) * nx + (p[1] - cy) * ny - bias;
+    const a = [];
+    const b = [];
+    for (let i = 0; i < pts.length; i += 1) {
+      const p = pts[i];
+      const q = pts[(i + 1) % pts.length];
+      const sp = side(p);
+      const sq = side(q);
+      if (sp >= 0) a.push(p);
+      else b.push(p);
+      if (sp >= 0 !== sq >= 0) {
+        const t = sp / (sp - sq);
+        const crossing = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+        a.push(crossing);
+        b.push(crossing);
+      }
+    }
+    if (a.length >= 3 && b.length >= 3) {
+      return [
+        { points: a, depth: shard.depth + 1 },
+        { points: b, depth: shard.depth + 1 }
+      ];
+    }
+    return [shard];
+  }
+  function* fracture(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const bleed = unit * 0.08;
+    const shards = [
+      { points: rectPoints(-bleed, -bleed, width + bleed * 2, height + bleed * 2), depth: 0 }
+    ];
+    const primaryAngle = rng.range(0, Math.PI);
+    const spread = 0.25 + genome.turbulence * 1.3;
+    const target = Math.round(12 + genome.density * 150);
+    while (shards.length < target) {
+      let widestIndex = 0;
+      let widestArea = -1;
+      for (let i = 0; i < Math.min(shards.length, 8); i += 1) {
+        const candidate = rng.int(0, shards.length - 1);
+        const b = boundsOf(shards[candidate].points);
+        const area = (b.maxX - b.minX) * (b.maxY - b.minY);
+        if (area > widestArea) {
+          widestArea = area;
+          widestIndex = candidate;
+        }
+      }
+      const targetShard = shards[widestIndex];
+      if (targetShard.depth > 9) break;
+      const pieces = splitShard(
+        targetShard,
+        primaryAngle + rng.gaussian(0, spread),
+        rng.gaussian(0, unit * 0.06 * (1 + genome.turbulence))
+      );
+      if (pieces.length !== 2) break;
+      shards.splice(widestIndex, 1, ...pieces);
+      if (shards.length % 12 === 0) yield shards.length / target * 0.55;
+    }
+    const shove = unit * (4e-3 + genome.turbulence * 0.05);
+    const dx = Math.cos(primaryAngle + Math.PI / 2);
+    const dy = Math.sin(primaryAngle + Math.PI / 2);
+    for (let i = 0; i < shards.length; i += 1) {
+      const shard = shards[i];
+      const [cx, cy] = centroid(shard.points);
+      const distance = Math.hypot(cx - width / 2, cy - height / 2) / (unit * 0.5);
+      const push_ = shove * distance * rng.range(-1, 1.4);
+      const moved = shard.points.map(([x, y]) => [x + dx * push_, y + dy * push_]);
+      const tone = noise(cx * 22e-4, cy * 22e-4);
+      push(scene, moved, {
+        closed: true,
+        fill: true,
+        tone,
+        weight: 0.4 + genome.weight * 2,
+        alpha: 0.32 + tone * (0.4 + genome.weight * 0.4),
+        accent: rng.next() > 0.93,
+        layer: rng.next() > 0.93 ? 1 : 0
+      });
+      if (i % 10 === 0) yield 0.55 + i / shards.length * 0.45;
+    }
+  }
+  function* shatter(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const impacts = 1 + Math.round(genome.turbulence * 4);
+    for (let k = 0; k < impacts; k += 1) {
+      const ix = rng.range(width * 0.2, width * 0.8);
+      const iy = rng.range(height * 0.2, height * 0.8);
+      const radials = Math.round(10 + genome.density * 60);
+      const angles = [];
+      for (let i = 0; i < radials; i += 1) {
+        const angle = i / radials * Math.PI * 2 + rng.gaussian(0, 0.12);
+        angles.push(angle);
+        const reach = unit * rng.range(0.15, 0.85);
+        const steps = 18;
+        const points = [[ix, iy]];
+        let a = angle;
+        let x = ix;
+        let y = iy;
+        for (let s = 0; s < steps; s += 1) {
+          a += (noise(x * 4e-3, y * 4e-3) - 0.5) * genome.turbulence * 0.5;
+          x += Math.cos(a) * (reach / steps);
+          y += Math.sin(a) * (reach / steps);
+          points.push([x, y]);
+        }
+        push(scene, points, {
+          tone: rng.next(),
+          weight: 0.6 + genome.weight * 2.4,
+          alpha: 0.35 + rng.next() * 0.5,
+          accent: rng.next() > 0.9,
+          layer: 0
+        });
+      }
+      const rings = Math.round(3 + genome.density * 14);
+      for (let r = 0; r < rings; r += 1) {
+        const radius = unit * (0.04 + r / rings * 0.7) * rng.range(0.85, 1.15);
+        const points = [];
+        for (const angle of angles) {
+          const jitter = radius * rng.range(0.9, 1.12);
+          points.push([ix + Math.cos(angle) * jitter, iy + Math.sin(angle) * jitter]);
+        }
+        push(scene, points, {
+          closed: true,
+          tone: r / rings,
+          weight: 0.5 + genome.weight * 1.6,
+          alpha: 0.3 + rng.next() * 0.35,
+          accent: r % 4 === 0,
+          layer: 1
+        });
+      }
+      yield (k + 1) / impacts;
+    }
+  }
+  function* lattice(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const margin = unit * 0.04;
+    const maxDepth = Math.round(3 + genome.density * 5);
+    const cells = [];
+    const queue = [
+      { x: margin, y: margin, w: width - margin * 2, h: height - margin * 2, depth: 0 }
+    ];
+    while (queue.length > 0) {
+      const cell = queue.pop();
+      const field = noise(cell.x * 16e-4, cell.y * 16e-4);
+      const shouldSplit = cell.depth < maxDepth && cell.w > unit * 0.03 && cell.h > unit * 0.03 && rng.next() < 0.42 + field * 0.5;
+      if (!shouldSplit) {
+        cells.push(cell);
+        continue;
+      }
+      const vertical = cell.w > cell.h ? true : cell.h > cell.w ? false : rng.bool();
+      const ratio = Math.max(0.18, Math.min(0.82, 0.5 + rng.gaussian(0, 0.16 * (1 - genome.symmetry * 0.7))));
+      if (vertical) {
+        const w1 = cell.w * ratio;
+        queue.push({ x: cell.x, y: cell.y, w: w1, h: cell.h, depth: cell.depth + 1 });
+        queue.push({ x: cell.x + w1, y: cell.y, w: cell.w - w1, h: cell.h, depth: cell.depth + 1 });
+      } else {
+        const h1 = cell.h * ratio;
+        queue.push({ x: cell.x, y: cell.y, w: cell.w, h: h1, depth: cell.depth + 1 });
+        queue.push({ x: cell.x, y: cell.y + h1, w: cell.w, h: cell.h - h1, depth: cell.depth + 1 });
+      }
+    }
+    yield 0.25;
+    const gutter = unit * 2e-3 * (1 + genome.weight);
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = cells[i];
+      const field = noise(cell.x * 3e-3 + 40, cell.y * 3e-3 + 40);
+      const broken = rng.next() < genome.turbulence * 0.16;
+      const offset = broken ? unit * 0.02 * genome.turbulence : 0;
+      const x = cell.x + gutter + (broken ? rng.range(-offset, offset) : 0);
+      const y = cell.y + gutter + (broken ? rng.range(-offset, offset) : 0);
+      const w = Math.max(1, cell.w - gutter * 2);
+      const h = Math.max(1, cell.h - gutter * 2);
+      push(scene, rectPoints(x, y, w, h), {
+        closed: true,
+        // Roughly a third of cells are solid; the rest read as outline.
+        fill: rng.next() < 0.38,
+        tone: field,
+        weight: 0.4 + genome.weight * 2,
+        alpha: 0.25 + field * (0.4 + genome.weight * 0.4),
+        accent: broken || rng.next() > 0.94,
+        layer: broken ? 1 : 0
+      });
+      if (i % 14 === 0) yield 0.25 + i / cells.length * 0.6;
+    }
+    const runs = Math.round(3 + genome.density * 16);
+    for (let i = 0; i < runs; i += 1) {
+      let px = rng.range(0, width);
+      let py = rng.range(0, height);
+      const points = [[px, py]];
+      const legs = rng.int(3, 9);
+      for (let l = 0; l < legs; l += 1) {
+        const length = unit * rng.range(0.04, 0.3);
+        if (l % 2 === 0) px += rng.bool() ? length : -length;
+        else py += rng.bool() ? length : -length;
+        points.push([px, py]);
+      }
+      push(scene, points, {
+        tone: 0.85,
+        weight: 0.6 + genome.weight * 2.4,
+        alpha: 0.35 + rng.next() * 0.45,
+        accent: i % 4 === 0,
+        layer: 1
+      });
+      yield 0.85 + i / runs * 0.15;
+    }
+  }
+  var BROKEN_ENGINES = [
+    {
+      key: "fracture",
+      label: "Fracture",
+      description: "The picture plane broken into shards and driven apart along hard diagonals. Each fragment keeps a piece of the original field.",
+      run: fracture
+    },
+    {
+      key: "shatter",
+      label: "Shatter",
+      description: "Cracks running outward from points of impact, joined by concentric rings. Struck glass rather than shifted plates.",
+      run: shatter
+    },
+    {
+      key: "lattice",
+      label: "Lattice",
+      description: "A rigid grid imposed on the canvas, then made to carry something it was not built for. The structure holds, but not evenly.",
+      run: lattice
+    }
+  ];
+
+  // src/art/engines/fields.ts
+  function* current(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const count = Math.round(320 + genome.density * 1500);
+    const scale = 7e-4 + genome.turbulence * 22e-4;
+    const step = unit * (4e-3 + genome.arousal * 7e-3);
+    const drift2 = rng.range(0, Math.PI * 2);
+    const pull = 0.28 + genome.gravity * 0.5;
+    for (let p = 0; p < count; p += 1) {
+      let x = rng.range(-unit * 0.1, width + unit * 0.1);
+      let y = rng.range(-unit * 0.1, height + unit * 0.1);
+      const loudness = arcAt(x / width);
+      const life = Math.round((30 + (1 - genome.turbulence) * 90) * rng.range(0.4, 1.3) * loudness);
+      const points = [[x, y]];
+      for (let s = 0; s < life; s += 1) {
+        const angle = noise(x * scale, y * scale) * Math.PI * 4 * (1 - pull) + drift2 * pull;
+        x += Math.cos(angle) * step;
+        y += Math.sin(angle) * step;
+        if (x < -unit * 0.2 || x > width + unit * 0.2 || y < -unit * 0.2 || y > height + unit * 0.2) break;
+        points.push([x, y]);
+      }
+      push(scene, points, {
+        tone: rng.next(),
+        weight: rng.range(0.4, 1.8) * (0.4 + genome.weight),
+        alpha: (0.16 + rng.next() * 0.5) * loudness,
+        accent: rng.next() > 0.94,
+        layer: rng.next() > 0.94 ? 1 : 0
+      });
+      if (p % 24 === 0) yield p / count;
+    }
+  }
+  function* terrain(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const levels = Math.round(8 + genome.density * 40);
+    const scale = 9e-4 + genome.turbulence * 16e-4;
+    const columns2 = Math.round(width / Math.max(4, unit * 6e-3));
+    for (let level = 0; level < levels; level += 1) {
+      const base = level / levels * height;
+      const points = [];
+      for (let c = 0; c <= columns2; c += 1) {
+        const x = c / columns2 * width;
+        const field = noise(x * scale, base * scale + level * 0.35);
+        const amplitude = unit * (0.02 + genome.turbulence * 0.16) * arcAt(x / width);
+        points.push([x, base + (field - 0.5) * amplitude * 2]);
+      }
+      push(scene, points, {
+        tone: level / levels,
+        weight: 0.5 + genome.weight * 1.4,
+        alpha: 0.3 + rng.next() * 0.45,
+        accent: level % 9 === 0,
+        layer: level % 9 === 0 ? 1 : 0
+      });
+      yield level / levels;
+    }
+  }
+  function* swarm(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const agents = Math.round(60 + genome.density * 260);
+    const steps = Math.round(40 + (1 - genome.turbulence) * 80);
+    const step = unit * (4e-3 + genome.arousal * 6e-3);
+    const xs = new Float64Array(agents);
+    const ys = new Float64Array(agents);
+    const as = new Float64Array(agents);
+    const live = [];
+    const finished = [];
+    for (let i = 0; i < agents; i += 1) {
+      xs[i] = rng.range(0, width);
+      ys[i] = rng.range(0, height);
+      as[i] = rng.range(0, Math.PI * 2);
+      live.push([[xs[i], ys[i]]]);
+    }
+    const cohesion = 0.02 + genome.gravity * 0.08;
+    for (let s = 0; s < steps; s += 1) {
+      let cx = 0;
+      let cy = 0;
+      for (let i = 0; i < agents; i += 1) {
+        cx += xs[i];
+        cy += ys[i];
+      }
+      cx /= agents;
+      cy /= agents;
+      for (let i = 0; i < agents; i += 1) {
+        const x = xs[i];
+        const y = ys[i];
+        const toCentre = Math.atan2(cy - y, cx - x);
+        const field = noise(x * 15e-4, y * 15e-4) * Math.PI * 4;
+        let angle = as[i];
+        angle += Math.sin(toCentre - angle) * cohesion;
+        angle += Math.sin(field - angle) * (0.05 + genome.turbulence * 0.2);
+        as[i] = angle;
+        const nx = x + Math.cos(angle) * step;
+        const ny = y + Math.sin(angle) * step;
+        const wrappedX = nx < 0 ? width : nx > width ? 0 : nx;
+        const wrappedY = ny < 0 ? height : ny > height ? 0 : ny;
+        xs[i] = wrappedX;
+        ys[i] = wrappedY;
+        if (wrappedX !== nx || wrappedY !== ny) {
+          finished.push(live[i]);
+          live[i] = [[wrappedX, wrappedY]];
+        } else {
+          live[i].push([nx, ny]);
+        }
+      }
+      if (s % 8 === 0) yield s / steps;
+    }
+    for (const trail of [...finished, ...live]) {
+      push(scene, trail, {
+        tone: rng.next(),
+        weight: rng.range(0.5, 2) * (0.4 + genome.weight),
+        alpha: 0.2 + rng.next() * 0.5,
+        accent: rng.next() > 0.92,
+        layer: rng.next() > 0.92 ? 1 : 0
+      });
+    }
+  }
+  function* columns(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const count = Math.round(40 + genome.density * 320);
+    for (let i = 0; i < count; i += 1) {
+      const x = rng.range(0, width);
+      const loudness = arcAt(x / width);
+      const top = rng.range(-height * 0.05, height * 0.7);
+      const length = height * rng.range(0.12, 0.9) * loudness;
+      const segments = Math.max(2, Math.round(length / (unit * 0.02)));
+      const points = [];
+      for (let s = 0; s <= segments; s += 1) {
+        const t = s / segments;
+        const y = top + length * t;
+        const sway = (noise(x * 4e-3, y * 2e-3) - 0.5) * unit * genome.turbulence * 0.14;
+        points.push([x + sway, y]);
+      }
+      push(scene, points, {
+        tone: rng.next(),
+        weight: rng.range(0.3, 2.4) * (0.4 + genome.weight),
+        alpha: (0.18 + rng.next() * 0.55) * loudness,
+        accent: rng.next() > 0.93,
+        layer: rng.next() > 0.93 ? 1 : 0
+      });
+      if (i % 32 === 0) yield i / count;
+    }
+  }
+  var FIELD_ENGINES = [
+    {
+      key: "current",
+      label: "Current",
+      description: "Particles released into a noise field, each tracing where the song pushed it. Nothing is placed; everything is carried.",
+      run: current
+    },
+    {
+      key: "terrain",
+      label: "Terrain",
+      description: "The song read as elevation \u2014 stacked contour lines that swell and settle like a landscape seen from above.",
+      run: terrain
+    },
+    {
+      key: "swarm",
+      label: "Swarm",
+      description: "Agents that steer toward one another, clumping and streaming. Structure emerges from crowding rather than from a field.",
+      run: swarm
+    },
+    {
+      key: "columns",
+      label: "Columns",
+      description: "Vertical striation falling the height of the picture \u2014 rain, curtains, or a downpour of light.",
+      run: columns
+    }
+  ];
+
+  // src/art/engines/layered.ts
+  function* strata(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const bandCount = Math.round(14 + genome.density * 70);
+    const roughness = unit * (4e-3 + genome.turbulence * 0.05);
+    const scale = 16e-4 + genome.turbulence * 4e-3;
+    const segments = Math.max(24, Math.round(width / 12));
+    let y = height * rng.range(1.02, 1.12);
+    let index = 0;
+    while (y > -height * 0.1 && index < bandCount * 2) {
+      const loudness = arcAt(1 - y / height);
+      const thickness = height / bandCount * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25) * loudness;
+      const top = y - thickness;
+      const upper = [];
+      for (let s = 0; s <= segments; s += 1) {
+        const x = s / segments * width;
+        const displacement = (noise(x * scale, top * scale + index * 0.7) - 0.5) * roughness * 2;
+        upper.push([x, top + displacement]);
+      }
+      push(scene, [[-roughness, y], ...upper, [width + roughness, y]], {
+        closed: true,
+        fill: true,
+        tone: index % 7 / 7,
+        weight: 0.5 + genome.weight,
+        alpha: (0.22 + rng.next() * (0.35 + genome.weight * 0.4)) * loudness,
+        accent: index % 7 === 0,
+        layer: index % 7 === 0 ? 1 : 0
+      });
+      y = top - thickness * rng.range(0.02, 0.3);
+      index += 1;
+      yield Math.min(0.85, index / bandCount);
+    }
+    const faults = Math.round(genome.turbulence * 9);
+    for (let f = 0; f < faults; f += 1) {
+      const fx = rng.range(width * 0.08, width * 0.92);
+      const points = [];
+      let px = fx;
+      for (let s = 0; s <= 60; s += 1) {
+        const py = s / 60 * height;
+        px += (noise(fx * 0.01, py * scale * 3) - 0.5) * roughness * 0.9;
+        points.push([px, py]);
+      }
+      push(scene, points, {
+        tone: 0.9,
+        weight: 1 + genome.weight * 3,
+        alpha: 0.3 + rng.next() * 0.4,
+        accent: f % 2 === 0,
+        layer: 1
+      });
+      yield 0.85 + f / Math.max(1, faults) * 0.15;
+    }
+  }
+  function* weave(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const spacing = Math.max(unit * 0.016, unit * (0.05 - genome.density * 0.03));
+    const amplitude = unit * (4e-3 + genome.turbulence * 0.03);
+    let index = 0;
+    for (let x = spacing * 0.5; x < width; x += spacing) {
+      const points = [];
+      const steps = Math.max(8, Math.round(height / (unit * 0.02)));
+      for (let s = 0; s <= steps; s += 1) {
+        const y = s / steps * height;
+        const over = Math.sin(y / spacing * Math.PI) * amplitude;
+        const drift2 = (noise(x * 3e-3, y * 3e-3) - 0.5) * amplitude * 2;
+        points.push([x + over + drift2, y]);
+      }
+      push(scene, points, {
+        tone: index % 5 / 5,
+        weight: 0.7 + genome.weight * 2.2,
+        alpha: 0.5 + rng.next() * 0.45,
+        accent: index % 13 === 0,
+        layer: 0
+      });
+      index += 1;
+      if (index % 12 === 0) yield x / width * 0.5;
+    }
+    index = 0;
+    for (let y = spacing * 0.5; y < height; y += spacing) {
+      const loudness = arcAt(1 - y / height);
+      if (rng.next() > loudness) {
+        index += 1;
+        continue;
+      }
+      const points = [];
+      const steps = Math.max(8, Math.round(width / (unit * 0.02)));
+      for (let s = 0; s <= steps; s += 1) {
+        const x = s / steps * width;
+        const over = Math.sin(x / spacing * Math.PI + Math.PI / 2) * amplitude;
+        const drift2 = (noise(x * 3e-3, y * 3e-3 + 17) - 0.5) * amplitude * 2;
+        points.push([x, y + over + drift2]);
+      }
+      push(scene, points, {
+        tone: index % 5 / 5,
+        weight: 0.7 + genome.weight * 2.2,
+        alpha: (0.5 + rng.next() * 0.45) * loudness,
+        accent: index % 13 === 0,
+        layer: 1
+      });
+      index += 1;
+      if (index % 12 === 0) yield 0.5 + y / height * 0.5;
+    }
+  }
+  function* moire(env) {
+    const { width, height, unit, scene, rng, genome } = env;
+    const diagonal = Math.hypot(width, height);
+    const layerCount = 2 + Math.round(genome.turbulence * 1.5);
+    for (let layer = 0; layer < layerCount; layer += 1) {
+      const angle = layer / layerCount * Math.PI + rng.gaussian(0, 0.06);
+      const spacing = Math.max(unit * 0.012, unit * (0.045 - genome.density * 0.03)) * (1 + layer * 0.04);
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const cx = width / 2 + rng.gaussian(0, unit * 0.03);
+      const cy = height / 2 + rng.gaussian(0, unit * 0.03);
+      let index = 0;
+      for (let offset = -diagonal / 2; offset < diagonal / 2; offset += spacing) {
+        const nx = -sin * offset;
+        const ny = cos * offset;
+        push(
+          scene,
+          [
+            [cx + nx - cos * diagonal, cy + ny - sin * diagonal],
+            [cx + nx + cos * diagonal, cy + ny + sin * diagonal]
+          ],
+          {
+            tone: layer / layerCount,
+            weight: 0.7 + genome.weight * 1.9,
+            alpha: 0.5 + rng.next() * 0.35,
+            accent: layer === layerCount - 1 && index % 17 === 0,
+            layer
+          }
+        );
+        index += 1;
+      }
+      yield (layer + 1) / layerCount;
+    }
+  }
+  var LAYERED_ENGINES = [
+    {
+      key: "strata",
+      label: "Strata",
+      description: "The image laid down in horizontal bands, like sediment or a stack of exposures. Older layers show through the newer ones.",
+      run: strata
+    },
+    {
+      key: "weave",
+      label: "Weave",
+      description: "Warp and weft crossing over and under each other. The picture is a cloth, and its density is the tightness of the thread.",
+      run: weave
+    },
+    {
+      key: "moire",
+      label: "Moir\xE9",
+      description: "Line grids laid over one another at almost the same angle, until the interference between them becomes the subject.",
+      run: moire
+    }
+  ];
+
+  // src/art/engines/organic.ts
+  function* growth(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const seeds = Math.round(2 + genome.density * 12);
+    const branches = [];
+    for (let i = 0; i < seeds; i += 1) {
+      const grounded = rng.next() < genome.gravity;
+      branches.push({
+        x: grounded ? rng.range(0, width) : rng.range(width * 0.1, width * 0.9),
+        y: grounded ? height * rng.range(0.94, 1.02) : rng.range(height * 0.15, height * 0.9),
+        angle: grounded ? -Math.PI / 2 + rng.gaussian(0, 0.3) : rng.range(0, Math.PI * 2),
+        energy: unit * rng.range(0.34, 0.6) * (0.65 + genome.density * 0.6),
+        thickness: 0.6 + genome.weight * 3 * rng.range(0.7, 1.4),
+        generation: 0
+      });
+    }
+    const splitAngle = 0.28 + genome.turbulence * 0.75;
+    const wander = 0.12 + genome.turbulence * 0.4;
+    const decay = 0.68 + (1 - genome.turbulence) * 0.12;
+    const budget = Math.round(1200 + genome.density * 9e3);
+    const tips = [];
+    let head = 0;
+    let processed = 0;
+    while (head < branches.length && processed < budget) {
+      const branch = branches[head];
+      head += 1;
+      processed += 1;
+      if (branch.energy < unit * 8e-3 || branch.generation > 11) {
+        tips.push([branch.x, branch.y]);
+        continue;
+      }
+      const length = branch.energy * rng.range(0.4, 0.7);
+      let x = branch.x;
+      let y = branch.y;
+      let angle = branch.angle;
+      const points = [[x, y]];
+      for (let s = 0; s < 6; s += 1) {
+        angle += (noise(x * 3e-3, y * 3e-3) - 0.5) * wander;
+        x += Math.cos(angle) * (length / 6);
+        y += Math.sin(angle) * (length / 6);
+        points.push([x, y]);
+      }
+      push(scene, points, {
+        tone: Math.min(1, branch.generation / 10),
+        weight: branch.thickness,
+        alpha: 0.4 + rng.next() * 0.45,
+        accent: branch.generation > 6 && rng.next() > 0.85,
+        layer: branch.generation > 6 ? 1 : 0
+      });
+      if (x < -unit * 0.1 || x > width + unit * 0.1 || y < -unit * 0.1 || y > height + unit * 0.1) {
+        continue;
+      }
+      const children = rng.next() < 0.12 + genome.density * 0.25 ? 3 : 2;
+      for (let c = 0; c < children; c += 1) {
+        branches.push({
+          x,
+          y,
+          angle: angle + (c - (children - 1) / 2) * splitAngle + rng.gaussian(0, 0.1),
+          energy: branch.energy * decay * rng.range(0.8, 1.1),
+          thickness: branch.thickness * rng.range(0.62, 0.82),
+          generation: branch.generation + 1
+        });
+      }
+      if (processed % 90 === 0) yield Math.min(0.9, processed / budget);
+    }
+    for (let i = 0; i < tips.length; i += 1) {
+      const tip = tips[i];
+      push(scene, circlePoints(tip[0], tip[1], unit * 2e-3 * rng.range(0.6, 2.6), 12), {
+        closed: true,
+        fill: true,
+        tone: 0.9,
+        weight: 0.5,
+        alpha: 0.35 + rng.next() * 0.45,
+        accent: rng.next() > 0.8,
+        layer: 1
+      });
+      if (i % 200 === 0) yield 0.9 + i / Math.max(1, tips.length) * 0.1;
+    }
+  }
+  function* constellation(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const clouds = Math.round(5 + genome.density * 16);
+    for (let i = 0; i < clouds; i += 1) {
+      scene.glows.push({
+        x: rng.range(0, width),
+        y: rng.range(0, height),
+        radius: unit * rng.range(0.1, 0.55),
+        tone: rng.next(),
+        accent: false,
+        strength: 0.14 + rng.next() * 0.2
+      });
+    }
+    yield 0.1;
+    const stars = [];
+    const target = Math.round(120 + genome.density * 700);
+    let attempts = 0;
+    while (stars.length < target && attempts < target * 6) {
+      attempts += 1;
+      const x = rng.range(0, width);
+      const y = rng.range(0, height);
+      const bias = noise(x * 18e-4, y * 18e-4) * arcAt(x / width);
+      if (rng.next() > bias * (0.5 + genome.density)) continue;
+      stars.push({
+        x,
+        y,
+        size: unit * 12e-4 * rng.range(0.4, 3.6) * (1 + genome.weight),
+        brightness: rng.next()
+      });
+    }
+    yield 0.35;
+    const linkRadius = unit * (0.05 + genome.gravity * 0.1 + genome.turbulence * 0.04);
+    for (let i = 0; i < stars.length; i += 1) {
+      const a = stars[i];
+      if (a.brightness < 0.55) continue;
+      for (let j = i + 1; j < stars.length; j += 1) {
+        const b = stars[j];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d > linkRadius || rng.next() > 0.22) continue;
+        push(scene, [[a.x, a.y], [b.x, b.y]], {
+          tone: 0.2,
+          weight: 0.35 + genome.weight * 0.8,
+          alpha: (1 - d / linkRadius) * 0.4,
+          layer: 0
+        });
+      }
+      if (i % 60 === 0) yield 0.35 + i / stars.length * 0.35;
+    }
+    for (let i = 0; i < stars.length; i += 1) {
+      const star = stars[i];
+      const bright = star.brightness > 0.93;
+      push(scene, circlePoints(star.x, star.y, star.size, bright ? 16 : 10), {
+        closed: true,
+        fill: true,
+        tone: star.brightness,
+        weight: 0.5,
+        alpha: 0.35 + star.brightness * 0.6,
+        accent: bright,
+        layer: bright ? 1 : 0
+      });
+      if (bright) {
+        scene.glows.push({
+          x: star.x,
+          y: star.y,
+          radius: star.size * 14,
+          tone: 0.1,
+          accent: true,
+          strength: 0.3
+        });
+        const flare = star.size * rng.range(6, 16);
+        push(scene, [[star.x - flare, star.y], [star.x + flare, star.y]], {
+          tone: 0.95,
+          weight: 0.5 + genome.weight,
+          alpha: 0.5,
+          accent: true,
+          layer: 1
+        });
+        push(scene, [[star.x, star.y - flare], [star.x, star.y + flare]], {
+          tone: 0.95,
+          weight: 0.5 + genome.weight,
+          alpha: 0.5,
+          accent: true,
+          layer: 1
+        });
+      }
+      if (i % 120 === 0) yield 0.7 + i / stars.length * 0.3;
+    }
+  }
+  function* drift(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const count = Math.round(300 + genome.density * 2600);
+    const length = unit * (6e-3 + genome.arousal * 0.05);
+    for (let i = 0; i < count; i += 1) {
+      const x = rng.range(0, width);
+      const y = rng.range(0, height);
+      const bias = noise(x * 22e-4, y * 22e-4) * arcAt(x / width);
+      if (rng.next() > bias * 1.3) continue;
+      const angle = noise(x * 1e-3 + 9, y * 1e-3 + 9) * Math.PI * 4;
+      const len = length * rng.range(0.3, 1.6);
+      push(
+        scene,
+        [
+          [x - Math.cos(angle) * len * 0.5, y - Math.sin(angle) * len * 0.5],
+          [x + Math.cos(angle) * len * 0.5, y + Math.sin(angle) * len * 0.5]
+        ],
+        {
+          tone: bias,
+          weight: rng.range(0.3, 2.2) * (0.4 + genome.weight),
+          alpha: 0.25 + rng.next() * 0.5,
+          accent: rng.next() > 0.95,
+          layer: rng.next() > 0.95 ? 1 : 0
+        }
+      );
+      if (i % 96 === 0) yield i / count;
+    }
+  }
+  var ORGANIC_ENGINES = [
+    {
+      key: "growth",
+      label: "Growth",
+      description: "Branching forms grown from seed points, splitting and thinning until they run out of energy.",
+      run: growth
+    },
+    {
+      key: "constellation",
+      label: "Constellation",
+      description: "Points of light scattered across a dark ground, with faint lines drawn between the ones that belong together.",
+      run: constellation
+    },
+    {
+      key: "drift",
+      label: "Drift",
+      description: "Thousands of short strokes aligned to a hidden field. No objects, no centre \u2014 only accumulated texture.",
+      run: drift
+    }
+  ];
+
+  // src/art/engines/radial.ts
+  function centreOf(env) {
+    const { width, height, unit, rng, genome } = env;
+    return [
+      width / 2 + rng.gaussian(0, unit * 0.06 * (1 + genome.turbulence)),
+      height / 2 + rng.gaussian(0, unit * 0.05 * (1 + genome.turbulence))
+    ];
+  }
+  function* radiance(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const [cx, cy] = centreOf(env);
+    const maxRadius = Math.hypot(width, height) * 0.62;
+    const core = unit * (0.06 + genome.gravity * 0.16);
+    scene.glows.push({ x: cx, y: cy, radius: core * 3.2, tone: 0.1, accent: true, strength: 1 });
+    const rays = Math.round(50 + genome.density * 320);
+    for (let i = 0; i < rays; i += 1) {
+      const even = i / rays * Math.PI * 2;
+      const angle = even * genome.symmetry + rng.range(0, Math.PI * 2) * (1 - genome.symmetry);
+      const inner = core * rng.range(0.7, 1.6);
+      const outer = inner + maxRadius * rng.range(0.12, 1) * (0.4 + genome.arousal * 0.8);
+      const points = [];
+      const segments = 12;
+      for (let s = 0; s <= segments; s += 1) {
+        const t = s / segments;
+        const r = inner + (outer - inner) * t;
+        const wobble = (noise(Math.cos(angle) * r * 4e-3, Math.sin(angle) * r * 4e-3) - 0.5) * genome.turbulence * 0.9 * t;
+        const a = angle + wobble;
+        points.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+      }
+      push(scene, points, {
+        tone: rng.next(),
+        weight: rng.range(0.4, 2.2) * (0.4 + genome.weight),
+        alpha: 0.14 + rng.next() * 0.5,
+        accent: rng.next() > 0.9,
+        layer: rng.next() > 0.9 ? 1 : 0
+      });
+      if (i % 24 === 0) yield i / rays * 0.7;
+    }
+    const orbits2 = Math.round(4 + genome.density * 22 + (genome.heard ? genome.sections * 2 : 0));
+    for (let i = 0; i < orbits2; i += 1) {
+      const r = core * 1.5 + (maxRadius - core) * ((i + rng.range(0, 0.6)) / orbits2);
+      const start = rng.range(0, Math.PI * 2);
+      const sweep = Math.PI * 2 * (0.25 + (1 - genome.turbulence) * rng.range(0.3, 0.75));
+      push(scene, arcPoints(cx, cy, r, start, sweep), {
+        tone: i / orbits2,
+        weight: rng.range(0.6, 2.4) * (0.4 + genome.weight),
+        alpha: 0.22 + rng.next() * 0.45,
+        accent: i % 5 === 0,
+        layer: i % 5 === 0 ? 1 : 0
+      });
+      yield 0.7 + i / orbits2 * 0.3;
+    }
+  }
+  function* spiral(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const [cx, cy] = centreOf(env);
+    const maxRadius = Math.hypot(width, height) * 0.55;
+    const turns = 8 + Math.round(genome.density * 60);
+    const perTurn = 90;
+    const total = turns * perTurn;
+    const wobbleAmount = unit * genome.turbulence * 0.05;
+    const points = [];
+    for (let i = 0; i <= total; i += 1) {
+      const t = i / total;
+      const angle = t * turns * Math.PI * 2;
+      const r = maxRadius * Math.pow(t, 0.85);
+      const wobble = (noise(Math.cos(angle) * r * 0.01, Math.sin(angle) * r * 0.01) - 0.5) * wobbleAmount;
+      points.push([cx + Math.cos(angle) * (r + wobble), cy + Math.sin(angle) * (r + wobble)]);
+      if (i % 900 === 0) yield i / total * 0.7;
+    }
+    push(scene, points, {
+      tone: 0.5,
+      weight: 0.8 + genome.weight * 2,
+      alpha: 0.85,
+      layer: 0
+    });
+    const counters = Math.round(genome.turbulence * 5);
+    for (let c = 0; c < counters; c += 1) {
+      const ccx = rng.range(width * 0.2, width * 0.8);
+      const ccy = rng.range(height * 0.2, height * 0.8);
+      const cTurns = 4 + rng.int(0, 10);
+      const cRadius = unit * rng.range(0.08, 0.3);
+      const cPoints = [];
+      for (let i = 0; i <= cTurns * 60; i += 1) {
+        const t = i / (cTurns * 60);
+        const angle = -t * cTurns * Math.PI * 2;
+        const r = cRadius * Math.pow(t, 0.9);
+        cPoints.push([ccx + Math.cos(angle) * r, ccy + Math.sin(angle) * r]);
+      }
+      push(scene, cPoints, {
+        tone: rng.next(),
+        weight: 0.6 + genome.weight,
+        alpha: 0.6,
+        accent: c % 2 === 0,
+        layer: c % 2 === 0 ? 1 : 0
+      });
+      yield 0.7 + c / Math.max(1, counters) * 0.3;
+    }
+  }
+  function* orbits(env) {
+    const { width, height, scene, rng, genome } = env;
+    const [cx, cy] = centreOf(env);
+    const maxRadius = Math.min(width, height) * 0.46;
+    const rings = Math.round(10 + genome.density * 90);
+    for (let i = 0; i < rings; i += 1) {
+      const t = i / rings;
+      const rx = maxRadius * (0.08 + t * 0.95);
+      const ry = rx * rng.range(0.25, 1);
+      const tilt = t * Math.PI * (0.5 + genome.turbulence * 3) + rng.gaussian(0, 0.1);
+      const segments = 80;
+      const points = [];
+      for (let s = 0; s <= segments; s += 1) {
+        const a = s / segments * Math.PI * 2;
+        const x = Math.cos(a) * rx;
+        const y = Math.sin(a) * ry;
+        points.push([
+          cx + x * Math.cos(tilt) - y * Math.sin(tilt),
+          cy + x * Math.sin(tilt) + y * Math.cos(tilt)
+        ]);
+      }
+      push(scene, points, {
+        closed: true,
+        tone: t,
+        weight: 0.4 + genome.weight * 1.6,
+        alpha: 0.22 + rng.next() * 0.4,
+        accent: i % 11 === 0,
+        layer: i % 11 === 0 ? 1 : 0
+      });
+      if (i % 8 === 0) yield i / rings;
+    }
+  }
+  function* bloom(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const discs = [];
+    const target = Math.round(60 + genome.density * 500);
+    const maxRadius = unit * (0.04 + (1 - genome.density) * 0.12);
+    let attempts = 0;
+    while (discs.length < target && attempts < target * 40) {
+      attempts += 1;
+      const x = rng.range(0, width);
+      const y = rng.range(0, height);
+      const bias = noise(x * 18e-4, y * 18e-4) * arcAt(x / width);
+      if (rng.next() > bias * 1.2) continue;
+      let r = maxRadius * rng.range(0.15, 1);
+      for (const d of discs) {
+        const gap = Math.hypot(d.x - x, d.y - y) - d.r;
+        if (gap < r) r = gap;
+        if (r < unit * 4e-3) break;
+      }
+      if (r < unit * 4e-3) continue;
+      discs.push({ x, y, r });
+      const segments = Math.max(10, Math.round(r / (unit * 2e-3)));
+      push(scene, circlePoints(x, y, r, Math.min(64, segments)), {
+        closed: true,
+        fill: rng.next() < 0.35,
+        tone: bias,
+        weight: 0.4 + genome.weight * 1.8,
+        alpha: 0.3 + rng.next() * 0.5,
+        accent: rng.next() > 0.93,
+        layer: rng.next() > 0.93 ? 1 : 0
+      });
+      if (discs.length % 24 === 0) yield discs.length / target;
+    }
+  }
+  var RADIAL_ENGINES = [
+    {
+      key: "radiance",
+      label: "Radiance",
+      description: "Everything organized around a single luminous centre \u2014 rays, arcs, and orbits that either resolve into a halo or burn out at the edges.",
+      run: radiance
+    },
+    {
+      key: "spiral",
+      label: "Spiral",
+      description: "One continuous line wound from the centre outward. A single gesture that never lifts, circling the same point hundreds of times.",
+      run: spiral
+    },
+    {
+      key: "orbits",
+      label: "Orbits",
+      description: "Nested ellipses at drifting angles, overlapping into interference. Cycles that almost, but never quite, align.",
+      run: orbits
+    },
+    {
+      key: "bloom",
+      label: "Bloom",
+      description: "Circles grown outward until they touch, packing tight in some places and leaving the canvas open in others.",
+      run: bloom
+    }
+  ];
+
+  // src/art/engines/index.ts
+  var ENGINES = [
+    ...FIELD_ENGINES,
+    ...RADIAL_ENGINES,
+    ...LAYERED_ENGINES,
+    ...BROKEN_ENGINES,
+    ...ORGANIC_ENGINES
+  ];
+  var ENGINE_BY_KEY = new Map(ENGINES.map((e) => [e.key, e]));
+
+  // src/art/treatments.ts
+  var MAX_MARKS = 12e4;
+  function cap(marks) {
+    return marks.length > MAX_MARKS ? marks.slice(0, MAX_MARKS) : marks;
+  }
+  function hatchFills(marks, ctx, options) {
+    const out = [];
+    for (const m of marks) {
+      if (!m.fill || m.points.length < 3) {
+        out.push(m);
+        continue;
+      }
+      const density = options.tonal ? 0.4 + (1 - m.tone) * 1.6 : 1;
+      const spacing = Math.max(ctx.unit * 18e-4, options.spacing * ctx.unit / density);
+      const angle = ctx.rng.range(0, Math.PI);
+      for (const line of hatchPolygon(m.points, angle, spacing)) {
+        out.push(mark(line, {
+          tone: m.tone,
+          weight: m.weight * 0.55,
+          alpha: Math.min(1, m.alpha * 1.25),
+          accent: m.accent,
+          layer: m.layer
+        }));
+      }
+      if (options.cross) {
+        for (const line of hatchPolygon(m.points, angle + Math.PI / 2.4, spacing * 1.25)) {
+          out.push(mark(line, {
+            tone: m.tone,
+            weight: m.weight * 0.45,
+            alpha: Math.min(1, m.alpha),
+            accent: m.accent,
+            layer: m.layer
+          }));
+        }
+      }
+      if (options.keepOutline) {
+        out.push({ ...m, fill: false, alpha: Math.min(1, m.alpha * 1.4) });
+      }
+      if (out.length > MAX_MARKS) break;
+    }
+    return cap(out);
+  }
+  function stipple(marks, ctx) {
+    const out = [];
+    const dot = ctx.unit * 2e-3;
+    const firm = (alpha) => Math.max(0.5, Math.min(1, alpha * 1.5));
+    const emit = (p, m, scale) => {
+      const r = dot * scale;
+      out.push(mark([[p[0] - r, p[1]], [p[0] + r, p[1]]], {
+        tone: m.tone,
+        weight: Math.max(1, m.weight) * 1.6,
+        alpha: firm(m.alpha),
+        accent: m.accent,
+        layer: m.layer
+      }));
+    };
+    for (const m of marks) {
+      const b = boundsOf(m.points);
+      const spanned = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+      if (m.fill && m.points.length >= 3 && spanned > ctx.unit * 0.012) {
+        const area = (b.maxX - b.minX) * (b.maxY - b.minY);
+        const wanted = Math.min(2600, Math.round(area / (ctx.unit * ctx.unit) * 2600 * (1 - m.tone * 0.6)));
+        let placed = 0;
+        let attempts = 0;
+        while (placed < wanted && attempts < wanted * 3) {
+          attempts += 1;
+          const p = [ctx.rng.range(b.minX, b.maxX), ctx.rng.range(b.minY, b.maxY)];
+          if (!pointInPolygon(p, m.points)) continue;
+          placed += 1;
+          emit(p, m, ctx.rng.range(0.5, 1.8));
+        }
+      } else if (spanned <= ctx.unit * 0.012) {
+        const [cx, cy] = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
+        emit([cx, cy], m, Math.max(0.7, spanned / dot * 0.5));
+      } else {
+        const stride = m.points.length > 40 ? 2 : 1;
+        let any = false;
+        for (let i = 0; i < m.points.length; i += stride) {
+          if (ctx.rng.next() > 0.72) continue;
+          emit(m.points[i], m, ctx.rng.range(0.45, 1.4));
+          any = true;
+        }
+        if (!any) emit(m.points[0], m, 1);
+      }
+      if (out.length > MAX_MARKS) break;
+    }
+    return cap(out);
+  }
+  function sketchPasses(marks, ctx, passes, amount) {
+    const out = [];
+    for (const m of marks) {
+      for (let p = 0; p < passes; p += 1) {
+        out.push({
+          ...m,
+          fill: false,
+          points: jitterPoints(m.points, ctx.unit * amount, ctx.noise, p * 13.7),
+          alpha: m.alpha * (p === 0 ? 0.9 : 0.55),
+          weight: m.weight * (p === 0 ? 1 : 0.75)
+        });
+      }
+      if (out.length > MAX_MARKS) break;
+    }
+    return cap(out);
+  }
+  function separations(marks, ctx, count, offset) {
+    const out = [];
+    const shifts = [];
+    for (let i = 0; i < count; i += 1) {
+      shifts.push([ctx.rng.gaussian(0, ctx.unit * offset), ctx.rng.gaussian(0, ctx.unit * offset)]);
+    }
+    for (const m of marks) {
+      for (let i = 0; i < count; i += 1) {
+        const shift = shifts[i];
+        out.push({
+          ...m,
+          points: m.points.map(([x, y]) => [x + shift[0], y + shift[1]]),
+          // Each pass is a different ink, so tone is quantized per separation.
+          tone: (i + 0.5) / count,
+          accent: i === count - 1 && m.accent,
+          alpha: m.alpha * 0.72,
+          layer: i
+        });
+      }
+      if (out.length > MAX_MARKS) break;
+    }
+    return cap(out);
+  }
+  function grain(env, strength) {
+    if (strength <= 0.02) return;
+    const { ctx, width, height, rng } = env;
+    const image = ctx.getImageData(0, 0, width, height);
+    const data = image.data;
+    const amount = strength * 26;
+    for (let i = 0; i < data.length; i += 4) {
+      const n = (rng.next() - 0.5) * amount;
+      data[i] = Math.max(0, Math.min(255, data[i] + n));
+      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n));
+      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + n));
+    }
+    ctx.putImageData(image, 0, 0);
+  }
+  function vignette(env) {
+    const { ctx, width, height, nocturne } = env;
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.25,
+      width / 2,
+      height / 2,
+      Math.max(width, height) * 0.78
+    );
+    gradient.addColorStop(0, "hsl(0 0% 0% / 0)");
+    gradient.addColorStop(1, nocturne ? "hsl(0 0% 0% / 0.55)" : "hsl(0 0% 12% / 0.24)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+  }
+  function bloom2(env, strength) {
+    const { ctx, width, height } = env;
+    const scratch = document.createElement("canvas");
+    scratch.width = Math.max(1, Math.round(width / 6));
+    scratch.height = Math.max(1, Math.round(height / 6));
+    const sctx = scratch.getContext("2d");
+    if (!sctx) return;
+    sctx.drawImage(ctx.canvas, 0, 0, scratch.width, scratch.height);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = strength;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(scratch, 0, 0, width, height);
+    ctx.restore();
+  }
+  function halftoneScreen(env, pitch) {
+    const { ctx, width, height, nocturne } = env;
+    ctx.save();
+    ctx.globalCompositeOperation = nocturne ? "multiply" : "screen";
+    ctx.fillStyle = nocturne ? "hsl(0 0% 0% / 0.5)" : "hsl(0 0% 100% / 0.4)";
+    for (let y = 0; y < height; y += pitch) {
+      for (let x = 0; x < width; x += pitch) {
+        ctx.beginPath();
+        ctx.arc(x, y, pitch * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+  function paperTexture(env) {
+    const { ctx, width, height, rng, nocturne } = env;
+    ctx.save();
+    ctx.globalCompositeOperation = nocturne ? "lighter" : "multiply";
+    ctx.strokeStyle = nocturne ? "hsl(40 30% 70% / 0.03)" : "hsl(30 20% 40% / 0.05)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 400; i += 1) {
+      const y = rng.range(0, height);
+      const x = rng.range(0, width);
+      const len = rng.range(width * 0.02, width * 0.2);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len, y + rng.range(-2, 2));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  var TREATMENTS = [
+    {
+      key: "ink",
+      label: "Ink",
+      description: "Clean strokes and solid regions. The geometry, stated plainly.",
+      plottable: true,
+      paint: { glows: true, lineCap: "round" },
+      finish: (env) => {
+        vignette(env);
+        grain(env, env.genome.grain * 0.7);
+      }
+    },
+    {
+      key: "hatch",
+      label: "Cross-hatch",
+      description: "Every region becomes crossed pen lines. Tone exists only as line density.",
+      plottable: true,
+      transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 0.012, cross: true, keepOutline: true, tonal: true }),
+      paint: { strokeOnly: true, lineCap: "round" },
+      finish: (env) => {
+        vignette(env);
+        grain(env, env.genome.grain * 0.5);
+      }
+    },
+    {
+      key: "engrave",
+      label: "Engraving",
+      description: "Fine parallel rulings, tightening where the image darkens. Banknote logic.",
+      plottable: true,
+      transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 6e-3, cross: false, keepOutline: false, tonal: true }),
+      paint: { strokeOnly: true, weightScale: 0.6, lineCap: "butt" },
+      finish: (env) => {
+        vignette(env);
+        grain(env, env.genome.grain * 0.35);
+      }
+    },
+    {
+      key: "stipple",
+      label: "Stipple",
+      description: "Nothing but dots. Density does all the work that a line would normally do.",
+      plottable: true,
+      transform: (marks, ctx) => stipple(marks, ctx),
+      paint: { strokeOnly: true, lineCap: "round", weightScale: 1.4 },
+      finish: (env) => {
+        vignette(env);
+        grain(env, env.genome.grain * 0.4);
+      }
+    },
+    {
+      key: "sketch",
+      label: "Sketch",
+      description: "Each mark drawn two or three times, never quite landing in the same place.",
+      plottable: true,
+      transform: (marks, ctx) => sketchPasses(marks, ctx, 3, 6e-3),
+      paint: { strokeOnly: true, alphaScale: 0.8, lineCap: "round" },
+      finish: (env) => {
+        paperTexture(env);
+        vignette(env);
+        grain(env, env.genome.grain * 0.6);
+      }
+    },
+    {
+      key: "woodcut",
+      label: "Woodcut",
+      description: "Heavy gouged marks, full contrast, no half measures. Everything is either cut or uncut.",
+      plottable: true,
+      transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 0.018, cross: false, keepOutline: true, tonal: false }).map((m) => ({
+        ...m,
+        alpha: 1,
+        weight: m.weight * (2.2 + ctx.genome.weight)
+      })),
+      paint: { strokeOnly: true, lineCap: "butt", alphaScale: 1 },
+      finish: (env) => {
+        paperTexture(env);
+        grain(env, env.genome.grain * 0.8);
+      }
+    },
+    {
+      key: "blueprint",
+      label: "Blueprint",
+      description: "Thin bright rulings on deep blue. A drawing meant to be built from.",
+      plottable: true,
+      groundShift: { lightness: -46, saturation: 34 },
+      transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 0.016, cross: false, keepOutline: true, tonal: false }),
+      paint: { strokeOnly: true, weightScale: 0.7, lineCap: "butt" },
+      finish: (env) => {
+        vignette(env);
+        grain(env, 0.25);
+      }
+    },
+    {
+      key: "riso",
+      label: "Risograph",
+      description: "Two or three ink passes, each slightly out of register, overprinting where they meet.",
+      plottable: true,
+      transform: (marks, ctx) => separations(marks, ctx, ctx.rng.bool() ? 2 : 3, 6e-3),
+      paint: { blend: "multiply", alphaScale: 0.85, lineCap: "round" },
+      finish: (env) => {
+        grain(env, 0.55);
+        paperTexture(env);
+      }
+    },
+    {
+      key: "screenprint",
+      label: "Screenprint",
+      description: "Flat spot colors pulled slightly off-register, with the screen showing through.",
+      plottable: true,
+      transform: (marks, ctx) => separations(marks, ctx, 2, 4e-3),
+      paint: { alphaScale: 0.95, lineCap: "butt", weightScale: 1.3 },
+      finish: (env) => {
+        halftoneScreen(env, Math.max(4, env.unit * 6e-3));
+        vignette(env);
+        grain(env, 0.3);
+      }
+    },
+    {
+      key: "wash",
+      label: "Wash",
+      description: "Soft, wide, translucent strokes that pool and bleed into one another.",
+      plottable: false,
+      paint: { weightScale: 5.5, alphaScale: 0.22, lineCap: "round", glows: true },
+      finish: (env) => {
+        bloom2(env, 0.35);
+        paperTexture(env);
+        vignette(env);
+        grain(env, env.genome.grain * 0.5);
+      }
+    },
+    {
+      key: "neon",
+      label: "Neon",
+      description: "Light rather than pigment \u2014 every line glows, and the dark does the rest.",
+      plottable: false,
+      groundShift: { lightness: -30 },
+      paint: { blend: "lighter", glows: true, lineCap: "round", alphaScale: 0.75 },
+      finish: (env) => {
+        bloom2(env, 0.6);
+        vignette(env);
+        grain(env, 0.2);
+      }
+    },
+    {
+      key: "halftone",
+      label: "Halftone",
+      description: "The whole image resolved into a printer\u2019s dot screen, coarse enough to see.",
+      plottable: false,
+      paint: { lineCap: "round", weightScale: 1.6 },
+      finish: (env) => {
+        halftoneScreen(env, Math.max(3, env.unit * 45e-4));
+        vignette(env);
+        grain(env, 0.35);
+      }
+    }
+  ];
+  var TREATMENT_BY_KEY = new Map(TREATMENTS.map((t) => [t.key, t]));
+
+  // src/analysis/interpret.ts
+  function describeStyle(key) {
+    const style = STYLE_BY_KEY.get(key) ?? null;
+    const engine = style ? ENGINE_BY_KEY.get(style.engine) : void 0;
+    const treatment = style ? TREATMENT_BY_KEY.get(style.treatment) : void 0;
+    return {
+      style,
+      label: style?.name ?? "Unknown",
+      system: engine?.description ?? "",
+      treatmentLabel: treatment?.label ?? "",
+      treatmentDescription: treatment?.description ?? "",
+      plottable: treatment?.plottable ?? false
+    };
+  }
   var HUE_BY_THEME = {
     love: 348,
     loss: 218,
@@ -2292,8 +3883,6 @@ button:disabled {
     water: 202,
     fire: 24
   };
-  var CALM_SYSTEMS = /* @__PURE__ */ new Set(["strata", "constellation", "growth", "radiance"]);
-  var AGITATED_SYSTEMS = /* @__PURE__ */ new Set(["fracture", "lattice", "current"]);
   function clamp2(v, lo, hi) {
     return v < lo ? lo : v > hi ? hi : v;
   }
@@ -2352,19 +3941,25 @@ button:disabled {
     }
     return h >>> 0;
   }
-  function interpret(analysis, audio, variation = 0) {
+  function selectStyle(analysis, audio, seed) {
+    const themes = analysis.themes.map((t) => ({ key: t.key, strength: t.strength }));
+    const lyricEnergy = analysis.arousal;
+    const lyricGrit = clamp2(analysis.arousal * 0.5 + Math.max(0, -analysis.valence) * 0.5, 0, 1);
+    const fromLyricsAlone = chooseStyle(themes, lyricEnergy, lyricGrit, seed).key;
+    if (!audio) return { chosen: fromLyricsAlone, fromLyricsAlone };
+    const heardEnergy = clamp2(
+      audio.energy * 0.45 + clamp2((audio.tempo - 60) / 120, 0, 1) * 0.3 + audio.onsetDensity * 0.25,
+      0,
+      1
+    );
+    const heardGrit = clamp2(audio.roughness * 0.7 + (1 - audio.dynamicRange) * 0.3, 0, 1);
+    return { chosen: chooseStyle(themes, heardEnergy, heardGrit, seed).key, fromLyricsAlone };
+  }
+  function interpret(analysis, audio, variation = 0, forcedStyle) {
     const dominant = analysis.themes[0];
     const dominantKey = dominant && dominant.strength > 0 ? dominant.key : "memory";
     const second = analysis.themes[1];
     const secondStrength = second?.strength ?? 0;
-    let system = SYSTEM_BY_THEME[dominantKey];
-    if (audio) {
-      if (aggression(audio) > 0.72 && CALM_SYSTEMS.has(system)) {
-        system = "fracture";
-      } else if (stillness(audio) > 0.72 && AGITATED_SYSTEMS.has(system)) {
-        system = dominantKey === "city" ? "strata" : "constellation";
-      }
-    }
     const modeShift = audio ? (audio.mode === "major" ? 0.32 : -0.32) * audio.keyConfidence : 0;
     const valence = audio ? clamp2(mix(analysis.valence, analysis.valence + modeShift + (audio.brightness - 0.5) * 0.3, 0.75), -1, 1) : analysis.valence;
     const heardArousal = audio ? clamp2(audio.energy * 0.45 + clamp2((audio.tempo - 60) / 120, 0, 1) * 0.3 + audio.onsetDensity * 0.25, 0, 1) : 0;
@@ -2379,9 +3974,11 @@ button:disabled {
       baseHue = themeHue;
     }
     const seedBase = audio ? (analysis.fingerprint ^ audioSeed(audio)) >>> 0 : analysis.fingerprint;
+    const seed = (seedBase ^ Math.imul(variation + 1, 2654435769)) >>> 0;
+    const style = forcedStyle && STYLE_BY_KEY.has(forcedStyle) ? forcedStyle : selectStyle(analysis, audio, seedBase).chosen;
     return {
-      system,
-      seed: (seedBase ^ Math.imul(variation + 1, 2654435769)) >>> 0,
+      style,
+      seed,
       baseHue,
       harmony: pickHarmony(analysis, dominantKey, audio),
       valence,
@@ -2434,7 +4031,7 @@ button:disabled {
     return "slow";
   }
   function explain(analysis, genome, audio) {
-    const info = SYSTEM_INFO[genome.system];
+    const info = describeStyle(genome.style);
     const dominant = analysis.themes[0];
     const second = analysis.themes[1];
     const notes = [];
@@ -2503,10 +4100,11 @@ button:disabled {
           `${audio.sections} structural sections detected, and the loudness arc across the track shapes where the canvas gets busy.`
         );
       }
-      const systemFromLyrics = dominant && dominant.strength > 0 ? SYSTEM_BY_THEME[dominant.key] : "strata";
-      if (systemFromLyrics !== genome.system) {
+      const { fromLyricsAlone } = selectStyle(analysis, audio, genome.seed);
+      if (fromLyricsAlone !== genome.style) {
+        const alternative = describeStyle(fromLyricsAlone);
         heardNotes.push(
-          `The words alone would have produced ${SYSTEM_INFO[systemFromLyrics].label}, but the music is too ${aggression(audio) > 0.6 ? "violent" : "still"} for that, so the machine overruled the lyrics and used ${info.label}.`
+          `The words alone would have produced ${alternative.label}, but the music is ${aggression(audio) > 0.6 ? "harder and rougher" : stillness(audio) > 0.6 ? "stiller" : "weighted differently"} than they are, so the machine chose ${info.label} instead.`
         );
       }
       if (audio.truncated) {
@@ -2520,8 +4118,11 @@ button:disabled {
       verdict,
       notes,
       heardNotes,
-      systemLabel: info.label,
-      systemDescription: info.description
+      styleLabel: info.label,
+      systemDescription: info.system,
+      treatmentLabel: info.treatmentLabel,
+      treatmentDescription: info.treatmentDescription,
+      plottable: info.plottable
     };
   }
 
@@ -2771,21 +4372,22 @@ button:disabled {
     const { baseHue, harmony, valence, arousal, rng } = input;
     const brightness = input.brightness ?? 0.5;
     const lift = (brightness - 0.5) * 22;
-    const nocturne = input.forceNocturne ?? valence < 0.08;
-    const saturation = 28 + arousal * 46 + Math.abs(valence) * 12;
+    const lightnessShift = input.lightnessShift ?? 0;
+    const nocturne = lightnessShift < -20 ? true : input.forceNocturne ?? valence < 0.08;
+    const saturation = 28 + arousal * 46 + Math.abs(valence) * 12 + (input.saturationShift ?? 0);
     const offsets = HARMONY_OFFSETS[harmony];
-    const groundLightness = nocturne ? 6 + Math.max(0, valence) * 6 + rng.range(0, 3) : 91 - Math.max(0, -valence) * 8 + rng.range(-2, 2);
+    const groundLightness = (nocturne ? 6 + Math.max(0, valence) * 6 + rng.range(0, 3) : 91 - Math.max(0, -valence) * 8 + rng.range(-2, 2)) + (lightnessShift < -20 ? Math.max(-6, lightnessShift + 26) : lightnessShift);
     const ground = hsl(
       baseHue + rng.range(-12, 12),
       nocturne ? saturation * 0.5 : saturation * 0.14,
       groundLightness
     );
     const marks = offsets.map((offset, i) => {
-      const drift = rng.range(-9, 9);
+      const drift2 = rng.range(-9, 9);
       const step = i / Math.max(1, offsets.length - 1);
       const lightness = nocturne ? 42 + step * 30 + arousal * 12 + lift : 46 - step * 26 - arousal * 8 - lift * 0.6;
       return hsl(
-        baseHue + offset + drift,
+        baseHue + offset + drift2,
         saturation * (0.72 + step * 0.35),
         lightness
       );
@@ -2874,661 +4476,98 @@ button:disabled {
     };
   }
 
-  // src/art/systems/current.ts
-  var current = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
-    const particleCount = Math.round(600 + genome.density * 2600);
-    const stepsPerParticle = Math.round(60 + (1 - genome.turbulence) * 260);
-    const scale = 7e-4 + genome.turbulence * 22e-4;
-    const stepLength = unit * (16e-4 + genome.arousal * 4e-3);
-    const lineWidth = unit * (4e-4 + genome.weight * 42e-4);
-    const driftAngle = rng.range(0, Math.PI * 2);
-    const driftStrength = 0.28 + genome.gravity * 0.5;
-    ctx.lineCap = "round";
-    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "multiply";
-    for (let p = 0; p < particleCount; p += 1) {
-      let x = rng.range(-unit * 0.1, width + unit * 0.1);
-      let y = rng.range(-unit * 0.1, height + unit * 0.1);
-      const tone = rng.next();
-      const color = tone > 0.94 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
-      const loudness = arcAt(x / width);
-      ctx.strokeStyle = color;
-      ctx.globalAlpha = (0.05 + rng.next() * (0.12 + genome.weight * 0.2)) * loudness;
-      ctx.lineWidth = lineWidth * rng.range(0.5, 1.9);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      const life = Math.round(stepsPerParticle * rng.range(0.35, 1.2) * loudness);
-      for (let s = 0; s < life; s += 1) {
-        const n = noise(x * scale, y * scale);
-        const fieldAngle = n * Math.PI * 4;
-        const angle = fieldAngle * (1 - driftStrength) + driftAngle * driftStrength;
-        x += Math.cos(angle) * stepLength;
-        y += Math.sin(angle) * stepLength;
-        if (x < -unit * 0.2 || x > width + unit * 0.2 || y < -unit * 0.2 || y > height + unit * 0.2) break;
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      if (p % 24 === 0) yield p / particleCount;
-    }
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 1;
-    const anchors = Math.round(3 + genome.weight * 9);
-    for (let i = 0; i < anchors; i += 1) {
-      let x = rng.range(0, width);
-      let y = rng.range(0, height);
-      ctx.strokeStyle = i % 3 === 0 ? palette.accent : palette.marks[0];
-      ctx.globalAlpha = 0.5 + rng.next() * 0.4;
-      ctx.lineWidth = lineWidth * rng.range(4, 11);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      for (let s = 0; s < 220; s += 1) {
-        const angle = noise(x * scale, y * scale) * Math.PI * 4 * (1 - driftStrength) + driftAngle * driftStrength;
-        x += Math.cos(angle) * stepLength * 1.6;
-        y += Math.sin(angle) * stepLength * 1.6;
-        if (x < 0 || x > width || y < 0 || y > height) break;
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      yield 0.9 + i / anchors * 0.1;
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  // src/art/systems/radiance.ts
-  var radiance = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
-    const cx = width / 2 + rng.gaussian(0, unit * 0.06 * (1 + genome.turbulence));
-    const cy = height / 2 + rng.gaussian(0, unit * 0.05 * (1 + genome.turbulence));
-    const maxRadius = Math.hypot(width, height) * 0.62;
-    const coreRadius = unit * (0.06 + genome.gravity * 0.16);
-    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreRadius * 3.2);
-    core.addColorStop(0, palette.nocturne ? hsl(genome.baseHue, 90, 88, 0.95) : hsl(genome.baseHue, 70, 96, 0.9));
-    core.addColorStop(0.35, palette.accent);
-    core.addColorStop(1, "hsl(0 0% 0% / 0)");
-    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
-    ctx.fillStyle = core;
-    ctx.beginPath();
-    ctx.arc(cx, cy, coreRadius * 3.2, 0, Math.PI * 2);
-    ctx.fill();
-    yield 0.05;
-    const rayCount = Math.round(60 + genome.density * 460);
-    ctx.lineCap = "round";
-    for (let i = 0; i < rayCount; i += 1) {
-      const even = i / rayCount * Math.PI * 2;
-      const scattered = rng.range(0, Math.PI * 2);
-      const angle = even * genome.symmetry + scattered * (1 - genome.symmetry);
-      const inner = coreRadius * rng.range(0.7, 1.6);
-      const outer = inner + maxRadius * rng.range(0.12, 1) * (0.4 + genome.arousal * 0.8);
-      ctx.strokeStyle = rng.next() > 0.9 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
-      ctx.globalAlpha = 0.08 + rng.next() * (0.18 + genome.weight * 0.3);
-      ctx.lineWidth = unit * (4e-4 + genome.weight * 5e-3) * rng.range(0.4, 2.2);
-      ctx.beginPath();
-      const segments = 14;
-      for (let s = 0; s <= segments; s += 1) {
-        const t = s / segments;
-        const r = inner + (outer - inner) * t;
-        const wobble = (noise(Math.cos(angle) * r * 4e-3, Math.sin(angle) * r * 4e-3) - 0.5) * genome.turbulence * 0.9 * t;
-        const a = angle + wobble;
-        const px = cx + Math.cos(a) * r;
-        const py = cy + Math.sin(a) * r;
-        if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      if (i % 20 === 0) yield 0.05 + i / rayCount * 0.55;
-    }
-    const orbitCount = Math.round(4 + genome.density * 22 + (genome.heard ? genome.sections * 2 : 0));
-    for (let i = 0; i < orbitCount; i += 1) {
-      const r = coreRadius * 1.5 + (maxRadius - coreRadius) * ((i + rng.range(0, 0.6)) / orbitCount);
-      const start = rng.range(0, Math.PI * 2);
-      const sweep = Math.PI * 2 * (0.25 + (1 - genome.turbulence) * rng.range(0.3, 0.75));
-      ctx.strokeStyle = i % 5 === 0 ? palette.accent : palette.marks[i % palette.marks.length];
-      ctx.globalAlpha = 0.18 + rng.next() * 0.4;
-      ctx.lineWidth = unit * (6e-4 + genome.weight * 4e-3) * rng.range(0.6, 2.4);
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, start, start + sweep);
-      ctx.stroke();
-      yield 0.6 + i / orbitCount * 0.25;
-    }
-    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
-    const motes = Math.round(120 + genome.density * 900);
-    for (let i = 0; i < motes; i += 1) {
-      const angle = rng.range(0, Math.PI * 2);
-      const r = coreRadius + Math.pow(rng.next(), 1.7) * maxRadius;
-      const px = cx + Math.cos(angle) * r;
-      const py = cy + Math.sin(angle) * r;
-      const size = unit * 1e-3 * rng.range(0.4, 3.4) * (1 + genome.weight);
-      ctx.fillStyle = rng.next() > 0.85 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
-      ctx.globalAlpha = 0.15 + rng.next() * 0.55;
-      ctx.beginPath();
-      ctx.arc(px, py, size, 0, Math.PI * 2);
-      ctx.fill();
-      if (i % 60 === 0) yield 0.85 + i / motes * 0.15;
-    }
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 1;
-  };
-
-  // src/art/systems/strata.ts
-  var strata = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
-    const bandCount = Math.round(14 + genome.density * 70);
-    const roughness = unit * (4e-3 + genome.turbulence * 0.05);
-    const scale = 16e-4 + genome.turbulence * 4e-3;
-    let y = height * rng.range(1.02, 1.12);
-    let index = 0;
-    while (y > -height * 0.1 && index < bandCount * 2) {
-      const loudness = arcAt(1 - y / height);
-      const thickness = height / bandCount * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25) * loudness;
-      const top = y - thickness;
-      const color = index % 7 === 0 ? palette.accent : palette.marks[index % palette.marks.length];
-      ctx.fillStyle = color;
-      ctx.globalAlpha = (0.2 + rng.next() * (0.35 + genome.weight * 0.4)) * loudness;
-      ctx.beginPath();
-      ctx.moveTo(-roughness, y);
-      const segments = Math.max(24, Math.round(width / 12));
-      for (let s = 0; s <= segments; s += 1) {
-        const px = s / segments * width;
-        const displacement = (noise(px * scale, top * scale + index * 0.7) - 0.5) * roughness * 2;
-        ctx.lineTo(px, top + displacement);
-      }
-      ctx.lineTo(width + roughness, y);
-      ctx.closePath();
-      ctx.fill();
-      const hairlines = Math.round(genome.density * 14);
-      ctx.globalAlpha = 0.1 + genome.weight * 0.25;
-      ctx.lineWidth = unit * 6e-4;
-      ctx.strokeStyle = palette.veil;
-      for (let h = 0; h < hairlines; h += 1) {
-        const hy = top + thickness * rng.next();
-        ctx.beginPath();
-        const startX = rng.range(-width * 0.1, width * 0.6);
-        const endX = startX + rng.range(width * 0.15, width * 0.9);
-        for (let s = 0; s <= 20; s += 1) {
-          const px = startX + (endX - startX) * s / 20;
-          const displacement = (noise(px * scale * 1.6, hy * scale * 1.6) - 0.5) * roughness;
-          if (s === 0) ctx.moveTo(px, hy + displacement);
-          else ctx.lineTo(px, hy + displacement);
-        }
-        ctx.stroke();
-      }
-      y = top - thickness * rng.range(0.02, 0.3);
-      index += 1;
-      yield Math.min(0.75, index / bandCount);
-    }
-    const faults = Math.round(genome.turbulence * 9);
-    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "multiply";
-    for (let f = 0; f < faults; f += 1) {
-      const fx = rng.range(width * 0.08, width * 0.92);
-      ctx.strokeStyle = f % 2 === 0 ? palette.accent : palette.veil;
-      ctx.globalAlpha = 0.25 + rng.next() * 0.4;
-      ctx.lineWidth = unit * (1e-3 + genome.weight * 6e-3) * rng.range(0.5, 2);
-      ctx.beginPath();
-      let px = fx;
-      for (let s = 0; s <= 60; s += 1) {
-        const py = s / 60 * height;
-        px += (noise(fx * 0.01, py * scale * 3) - 0.5) * roughness * 0.9;
-        if (s === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      yield 0.75 + f / Math.max(1, faults) * 0.15;
-    }
-    ctx.globalCompositeOperation = "source-over";
-    const horizonY = height * (0.32 + rng.next() * 0.36);
-    ctx.strokeStyle = palette.accent;
-    ctx.globalAlpha = 0.55 + genome.gravity * 0.35;
-    ctx.lineWidth = unit * (12e-4 + genome.weight * 3e-3);
-    ctx.beginPath();
-    ctx.moveTo(0, horizonY);
-    ctx.lineTo(width, horizonY);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    yield 1;
-  };
-
-  // src/art/systems/fracture.ts
-  function split(shard, angle, bias) {
-    const pts = shard.points;
-    let cx = 0;
-    let cy = 0;
-    for (const [x, y] of pts) {
-      cx += x;
-      cy += y;
-    }
-    cx /= pts.length;
-    cy /= pts.length;
-    const nx = Math.cos(angle);
-    const ny = Math.sin(angle);
-    const offset = bias;
-    const side = (p) => (p[0] - cx) * nx + (p[1] - cy) * ny - offset;
-    const a = [];
-    const b = [];
-    for (let i = 0; i < pts.length; i += 1) {
-      const p = pts[i];
-      const q = pts[(i + 1) % pts.length];
-      const sp = side(p);
-      const sq = side(q);
-      if (sp >= 0) a.push(p);
-      else b.push(p);
-      if (sp >= 0 !== sq >= 0) {
-        const t = sp / (sp - sq);
-        const intersection = [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
-        a.push(intersection);
-        b.push(intersection);
-      }
-    }
-    const out = [];
-    if (a.length >= 3) out.push({ points: a, depth: shard.depth + 1 });
-    if (b.length >= 3) out.push({ points: b, depth: shard.depth + 1 });
-    return out.length === 2 ? out : [shard];
+  // src/art/painter.ts
+  function colorFor(palette, m) {
+    if (m.accent) return palette.accent;
+    const index = Math.min(
+      palette.marks.length - 1,
+      Math.max(0, Math.floor(m.tone * palette.marks.length))
+    );
+    return palette.marks[index];
   }
-  var fracture = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
-    const bleed = unit * 0.08;
-    let shards = [
-      {
-        points: [
-          [-bleed, -bleed],
-          [width + bleed, -bleed],
-          [width + bleed, height + bleed],
-          [-bleed, height + bleed]
-        ],
-        depth: 0
-      }
-    ];
-    const primaryAngle = rng.range(0, Math.PI);
-    const angleSpread = 0.25 + genome.turbulence * 1.3;
-    const targetShards = Math.round(12 + genome.density * 150);
-    while (shards.length < targetShards) {
-      let widestIndex = 0;
-      let widestArea = -1;
-      const sampleCount = Math.min(shards.length, 8);
-      for (let i = 0; i < sampleCount; i += 1) {
-        const candidate = rng.int(0, shards.length - 1);
-        const pts = shards[candidate].points;
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-        for (const [x, y] of pts) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-        const area = (maxX - minX) * (maxY - minY);
-        if (area > widestArea) {
-          widestArea = area;
-          widestIndex = candidate;
-        }
-      }
-      const target = shards[widestIndex];
-      if (target.depth > 9) break;
-      const angle = primaryAngle + rng.gaussian(0, angleSpread);
-      const bias = rng.gaussian(0, unit * 0.06 * (1 + genome.turbulence));
-      const pieces = split(target, angle, bias);
-      if (pieces.length === 2) {
-        shards.splice(widestIndex, 1, ...pieces);
-      } else {
-        break;
-      }
-      if (shards.length % 12 === 0) yield shards.length / targetShards * 0.5;
-    }
-    const push = unit * (4e-3 + genome.turbulence * 0.05);
-    const dx = Math.cos(primaryAngle + Math.PI / 2);
-    const dy = Math.sin(primaryAngle + Math.PI / 2);
-    for (let i = 0; i < shards.length; i += 1) {
-      const shard = shards[i];
-      let cx = 0;
-      let cy = 0;
-      for (const [x, y] of shard.points) {
-        cx += x;
-        cy += y;
-      }
-      cx /= shard.points.length;
-      cy /= shard.points.length;
-      const distance = Math.hypot(cx - width / 2, cy - height / 2) / (unit * 0.5);
-      const shove = push * distance * rng.range(-1, 1.4);
-      ctx.save();
-      ctx.translate(dx * shove, dy * shove);
-      ctx.beginPath();
-      const first = shard.points[0];
-      ctx.moveTo(first[0], first[1]);
-      for (let p = 1; p < shard.points.length; p += 1) {
-        const pt = shard.points[p];
-        ctx.lineTo(pt[0], pt[1]);
-      }
-      ctx.closePath();
-      const tone = noise(cx * 22e-4, cy * 22e-4);
-      const paletteIndex = Math.min(
-        palette.marks.length - 1,
-        Math.floor(tone * palette.marks.length)
-      );
-      ctx.fillStyle = rng.next() > 0.93 ? palette.accent : palette.marks[paletteIndex];
-      ctx.globalAlpha = 0.3 + tone * (0.4 + genome.weight * 0.4);
-      ctx.fill();
-      ctx.strokeStyle = palette.nocturne ? palette.veil : "hsl(0 0% 8% / 0.75)";
-      ctx.globalAlpha = 0.35 + genome.weight * 0.5;
-      ctx.lineWidth = unit * (4e-4 + genome.weight * 35e-4);
-      ctx.stroke();
-      ctx.restore();
-      if (i % 10 === 0) yield 0.5 + i / shards.length * 0.45;
-    }
-    const slashes = Math.round(2 + genome.arousal * 8);
-    ctx.globalAlpha = 0.7;
-    ctx.lineCap = "square";
-    for (let i = 0; i < slashes; i += 1) {
-      const angle = primaryAngle + rng.gaussian(0, 0.4);
-      const cx = rng.range(0, width);
-      const cy = rng.range(0, height);
-      const length = unit * rng.range(0.4, 1.5);
-      ctx.strokeStyle = i % 2 === 0 ? palette.accent : palette.marks[0];
-      ctx.lineWidth = unit * (8e-4 + genome.weight * 5e-3) * rng.range(0.5, 2.5);
-      ctx.beginPath();
-      ctx.moveTo(cx - Math.cos(angle) * length, cy - Math.sin(angle) * length);
-      ctx.lineTo(cx + Math.cos(angle) * length, cy + Math.sin(angle) * length);
-      ctx.stroke();
-    }
+  function layGround(env, baseHue, arousal) {
+    const { ctx, width, height, palette } = env;
+    ctx.fillStyle = palette.ground;
+    ctx.fillRect(0, 0, width, height);
+    const angle = baseHue * (Math.PI / 180);
+    const wash = ctx.createLinearGradient(
+      width / 2 - Math.cos(angle) * width * 0.6,
+      height / 2 - Math.sin(angle) * height * 0.6,
+      width / 2 + Math.cos(angle) * width * 0.6,
+      height / 2 + Math.sin(angle) * height * 0.6
+    );
+    wash.addColorStop(0, palette.marks[0] ?? palette.veil);
+    wash.addColorStop(1, palette.ground);
+    ctx.globalAlpha = 0.16 + arousal * 0.1;
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1;
-    yield 1;
-  };
-
-  // src/art/systems/constellation.ts
-  var constellation = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
-    const clouds = Math.round(6 + genome.density * 20);
-    ctx.globalCompositeOperation = "lighter";
-    for (let i = 0; i < clouds; i += 1) {
-      const cx = rng.range(0, width);
-      const cy = rng.range(0, height);
-      const r = unit * rng.range(0.1, 0.55);
-      const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      gradient.addColorStop(0, palette.marks[rng.int(0, palette.marks.length - 1)]);
+  }
+  function paintGlows(env, scene) {
+    const { ctx, palette } = env;
+    ctx.save();
+    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
+    for (const glow of scene.glows) {
+      const gradient = ctx.createRadialGradient(glow.x, glow.y, 0, glow.x, glow.y, glow.radius);
+      const color = glow.accent ? palette.accent : palette.marks[Math.min(palette.marks.length - 1, Math.floor(glow.tone * palette.marks.length))];
+      gradient.addColorStop(0, color);
       gradient.addColorStop(1, "hsl(0 0% 0% / 0)");
-      ctx.globalAlpha = 0.05 + rng.next() * 0.14;
+      ctx.globalAlpha = glow.strength;
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.arc(glow.x, glow.y, glow.radius, 0, Math.PI * 2);
       ctx.fill();
-      yield i / clouds * 0.15;
     }
-    ctx.globalCompositeOperation = "source-over";
-    const starCount = Math.round(180 + genome.density * 1500);
-    const stars = [];
-    let attempts = 0;
-    while (stars.length < starCount && attempts < starCount * 6) {
-      attempts += 1;
-      const x = rng.range(0, width);
-      const y = rng.range(0, height);
-      const clusterBias = noise(x * 18e-4, y * 18e-4) * arcAt(x / width);
-      if (rng.next() > clusterBias * (0.5 + genome.density)) continue;
-      stars.push({
-        x,
-        y,
-        size: unit * 9e-4 * rng.range(0.4, 4) * (1 + genome.weight * 1.4),
-        brightness: rng.next()
-      });
+    ctx.restore();
+  }
+  function tracePath(ctx, m) {
+    const first = m.points[0];
+    if (!first) return;
+    ctx.beginPath();
+    ctx.moveTo(first[0], first[1]);
+    for (let i = 1; i < m.points.length; i += 1) {
+      const p = m.points[i];
+      ctx.lineTo(p[0], p[1]);
     }
-    yield 0.25;
-    const linkRadius = unit * (0.05 + genome.gravity * 0.1 + genome.turbulence * 0.04);
-    ctx.lineWidth = unit * 35e-5 * (1 + genome.weight);
-    for (let i = 0; i < stars.length; i += 1) {
-      const a = stars[i];
-      if (a.brightness < 0.55) continue;
-      for (let j = i + 1; j < stars.length; j += 1) {
-        const b = stars[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d > linkRadius) continue;
-        if (rng.next() > 0.22) continue;
-        ctx.strokeStyle = palette.veil;
-        ctx.globalAlpha = (1 - d / linkRadius) * 0.32;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
-      }
-      if (i % 40 === 0) yield 0.25 + i / stars.length * 0.35;
-    }
-    ctx.globalCompositeOperation = "lighter";
-    for (let i = 0; i < stars.length; i += 1) {
-      const star = stars[i];
-      const isBright = star.brightness > 0.93;
-      ctx.fillStyle = isBright ? palette.accent : palette.marks[Math.floor(star.brightness * palette.marks.length) % palette.marks.length];
-      ctx.globalAlpha = 0.3 + star.brightness * 0.65;
-      ctx.beginPath();
-      ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-      ctx.fill();
-      if (isBright) {
-        const glow = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, star.size * 14);
-        glow.addColorStop(0, palette.accent);
-        glow.addColorStop(1, "hsl(0 0% 0% / 0)");
-        ctx.globalAlpha = 0.28;
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size * 14, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = palette.accent;
-        ctx.globalAlpha = 0.5;
-        ctx.lineWidth = star.size * 0.5;
-        const flare = star.size * rng.range(6, 16);
-        ctx.beginPath();
-        ctx.moveTo(star.x - flare, star.y);
-        ctx.lineTo(star.x + flare, star.y);
-        ctx.moveTo(star.x, star.y - flare);
-        ctx.lineTo(star.x, star.y + flare);
-        ctx.stroke();
-      }
-      if (i % 80 === 0) yield 0.6 + i / stars.length * 0.4;
-    }
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 1;
-  };
-
-  // src/art/systems/lattice.ts
-  var lattice = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
-    const margin = unit * 0.04;
-    const maxDepth = Math.round(3 + genome.density * 5);
-    const cells = [];
-    const queue = [
-      { x: margin, y: margin, w: width - margin * 2, h: height - margin * 2, depth: 0 }
-    ];
-    while (queue.length > 0) {
-      const cell = queue.pop();
-      const field = noise(cell.x * 16e-4, cell.y * 16e-4);
-      const shouldSplit = cell.depth < maxDepth && cell.w > unit * 0.03 && cell.h > unit * 0.03 && rng.next() < 0.42 + field * 0.5;
-      if (!shouldSplit) {
-        cells.push(cell);
-        continue;
-      }
-      const vertical = cell.w > cell.h ? true : cell.h > cell.w ? false : rng.bool();
-      const middle = 0.5;
-      const ratio = middle + rng.gaussian(0, 0.16 * (1 - genome.symmetry * 0.7));
-      const clamped = Math.max(0.18, Math.min(0.82, ratio));
-      if (vertical) {
-        const w1 = cell.w * clamped;
-        queue.push({ x: cell.x, y: cell.y, w: w1, h: cell.h, depth: cell.depth + 1 });
-        queue.push({ x: cell.x + w1, y: cell.y, w: cell.w - w1, h: cell.h, depth: cell.depth + 1 });
-      } else {
-        const h1 = cell.h * clamped;
-        queue.push({ x: cell.x, y: cell.y, w: cell.w, h: h1, depth: cell.depth + 1 });
-        queue.push({ x: cell.x, y: cell.y + h1, w: cell.w, h: cell.h - h1, depth: cell.depth + 1 });
-      }
-    }
-    yield 0.2;
-    const gutter = unit * 2e-3 * (1 + genome.weight);
-    for (let i = 0; i < cells.length; i += 1) {
-      const cell = cells[i];
-      const field = noise(cell.x * 3e-3 + 40, cell.y * 3e-3 + 40);
-      const broken = rng.next() < genome.turbulence * 0.16;
-      const shove = broken ? unit * 0.02 * genome.turbulence : 0;
-      const x = cell.x + gutter + (broken ? rng.range(-shove, shove) : 0);
-      const y = cell.y + gutter + (broken ? rng.range(-shove, shove) : 0);
-      const w = Math.max(1, cell.w - gutter * 2);
-      const h = Math.max(1, cell.h - gutter * 2);
-      const color = broken || rng.next() > 0.94 ? palette.accent : palette.marks[Math.floor(field * palette.marks.length) % palette.marks.length];
-      const treatment = rng.next();
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(x, y, w, h);
-      ctx.clip();
-      if (treatment < 0.34) {
+    if (m.closed) ctx.closePath();
+  }
+  function paintMarks(env, marks, hints, from, budgetMs) {
+    const { ctx, unit, palette } = env;
+    const weightScale = hints.weightScale ?? 1;
+    const alphaScale = hints.alphaScale ?? 1;
+    const baseWidth = unit * 13e-4;
+    ctx.save();
+    ctx.lineCap = hints.lineCap ?? "round";
+    ctx.lineJoin = "round";
+    if (hints.blend) ctx.globalCompositeOperation = hints.blend;
+    const deadline = performance.now() + budgetMs;
+    let i = from;
+    for (; i < marks.length; i += 1) {
+      const m = marks[i];
+      if (m.points.length < 2) continue;
+      const color = colorFor(palette, m);
+      ctx.globalAlpha = Math.max(0, Math.min(1, m.alpha * alphaScale));
+      if (m.fill && !hints.strokeOnly && m.closed) {
+        tracePath(ctx, m);
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.2 + field * (0.4 + genome.weight * 0.4);
-        ctx.fillRect(x, y, w, h);
-      } else if (treatment < 0.62) {
+        ctx.fill();
         ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.3 + field * 0.4;
-        ctx.lineWidth = unit * 6e-4 * (1 + genome.weight * 2);
-        const spacing = Math.max(3, unit * 6e-3 * (1.6 - genome.density));
-        const diagonal = field > 0.5;
-        const span = w + h;
-        for (let s = -span; s < span; s += spacing) {
-          ctx.beginPath();
-          if (diagonal) {
-            ctx.moveTo(x + s, y);
-            ctx.lineTo(x + s + h, y + h);
-          } else {
-            ctx.moveTo(x, y + s);
-            ctx.lineTo(x + w, y + s);
-          }
-          ctx.stroke();
-        }
-      } else if (treatment < 0.84) {
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.45 + field * 0.4;
-        ctx.lineWidth = unit * 8e-4 * (1 + genome.weight * 3);
-        ctx.strokeRect(x, y, w, h);
+        ctx.lineWidth = baseWidth * m.weight * weightScale * 0.5;
+        ctx.stroke();
       } else {
-        const cols = Math.max(1, Math.round(w / (unit * 0.014)));
-        const rows = Math.max(1, Math.round(h / (unit * 0.02)));
-        for (let c = 0; c < cols; c += 1) {
-          for (let r = 0; r < rows; r += 1) {
-            if (rng.next() > 0.42 + genome.density * 0.3) continue;
-            ctx.fillStyle = rng.next() > 0.88 ? palette.accent : color;
-            ctx.globalAlpha = 0.3 + rng.next() * 0.6;
-            ctx.fillRect(
-              x + (c + 0.22) * (w / cols),
-              y + (r + 0.22) * (h / rows),
-              w / cols * 0.56,
-              h / rows * 0.56
-            );
-          }
-        }
+        tracePath(ctx, m);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(0.25, baseWidth * m.weight * weightScale);
+        ctx.stroke();
       }
-      ctx.restore();
-      if (i % 12 === 0) yield 0.2 + i / cells.length * 0.65;
+      if ((i & 63) === 0 && performance.now() > deadline) {
+        i += 1;
+        break;
+      }
     }
-    const runs = Math.round(3 + genome.density * 16);
-    ctx.lineCap = "square";
-    ctx.lineJoin = "miter";
-    for (let i = 0; i < runs; i += 1) {
-      ctx.strokeStyle = i % 4 === 0 ? palette.accent : palette.veil;
-      ctx.globalAlpha = 0.3 + rng.next() * 0.45;
-      ctx.lineWidth = unit * (6e-4 + genome.weight * 3e-3);
-      let px = rng.range(0, width);
-      let py = rng.range(0, height);
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      const legs = rng.int(3, 9);
-      for (let l = 0; l < legs; l += 1) {
-        const length = unit * rng.range(0.04, 0.3);
-        if (l % 2 === 0) px += rng.bool() ? length : -length;
-        else py += rng.bool() ? length : -length;
-        ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      ctx.fillStyle = palette.accent;
-      ctx.globalAlpha = 0.8;
-      ctx.beginPath();
-      ctx.arc(px, py, unit * 25e-4 * (1 + genome.weight), 0, Math.PI * 2);
-      ctx.fill();
-      yield 0.85 + i / runs * 0.15;
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  // src/art/systems/growth.ts
-  var growth = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
-    const seedCount = Math.round(2 + genome.density * 12);
-    const branches = [];
-    for (let i = 0; i < seedCount; i += 1) {
-      const grounded = rng.next() < genome.gravity;
-      branches.push({
-        x: grounded ? rng.range(0, width) : rng.range(width * 0.1, width * 0.9),
-        y: grounded ? height * rng.range(0.94, 1.02) : rng.range(height * 0.15, height * 0.9),
-        angle: grounded ? -Math.PI / 2 + rng.gaussian(0, 0.3) : rng.range(0, Math.PI * 2),
-        energy: unit * rng.range(0.34, 0.6) * (0.65 + genome.density * 0.6),
-        thickness: unit * (2e-3 + genome.weight * 0.012) * rng.range(0.7, 1.4),
-        generation: 0
-      });
-    }
-    ctx.lineCap = "round";
-    const splitAngle = 0.28 + genome.turbulence * 0.75;
-    const wander = 0.12 + genome.turbulence * 0.4;
-    const decay = 0.68 + (1 - genome.turbulence) * 0.12;
-    let processed = 0;
-    const budget = Math.round(3e3 + genome.density * 22e3);
-    const tips = [];
-    let head = 0;
-    while (head < branches.length && processed < budget) {
-      const branch = branches[head];
-      head += 1;
-      processed += 1;
-      if (branch.energy < unit * 8e-3 || branch.generation > 11) {
-        tips.push([branch.x, branch.y, branch.thickness]);
-        continue;
-      }
-      const segmentLength = branch.energy * rng.range(0.4, 0.7);
-      let x = branch.x;
-      let y = branch.y;
-      let angle = branch.angle;
-      ctx.strokeStyle = branch.generation > 6 && rng.next() > 0.85 ? palette.accent : palette.marks[Math.min(palette.marks.length - 1, branch.generation % palette.marks.length)];
-      ctx.globalAlpha = 0.35 + rng.next() * 0.5;
-      ctx.lineWidth = Math.max(0.4, branch.thickness);
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      const steps = 8;
-      for (let s = 0; s < steps; s += 1) {
-        angle += (noise(x * 3e-3, y * 3e-3) - 0.5) * wander;
-        x += Math.cos(angle) * (segmentLength / steps);
-        y += Math.sin(angle) * (segmentLength / steps);
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-      if (x < -unit * 0.1 || x > width + unit * 0.1 || y < -unit * 0.1 || y > height + unit * 0.1) {
-        continue;
-      }
-      const childCount = rng.next() < 0.12 + genome.density * 0.25 ? 3 : 2;
-      for (let c = 0; c < childCount; c += 1) {
-        const spread = (c - (childCount - 1) / 2) * splitAngle;
-        branches.push({
-          x,
-          y,
-          angle: angle + spread + rng.gaussian(0, 0.1),
-          energy: branch.energy * decay * rng.range(0.8, 1.1),
-          thickness: branch.thickness * rng.range(0.6, 0.82),
-          generation: branch.generation + 1
-        });
-      }
-      if (processed % 60 === 0) yield Math.min(0.85, processed / budget);
-    }
-    ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "source-over";
-    for (let i = 0; i < tips.length; i += 1) {
-      const tip = tips[i];
-      const size = Math.max(0.6, tip[2] * rng.range(1.2, 3.6));
-      ctx.fillStyle = rng.next() > 0.8 ? palette.accent : palette.marks[palette.marks.length - 1];
-      ctx.globalAlpha = 0.3 + rng.next() * 0.5;
-      ctx.beginPath();
-      ctx.arc(tip[0], tip[1], size, 0, Math.PI * 2);
-      ctx.fill();
-      if (i % 120 === 0) yield 0.85 + i / Math.max(1, tips.length) * 0.15;
-    }
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 1;
-  };
+    ctx.restore();
+    return i;
+  }
 
   // src/art/renderer.ts
   function makeArcSampler(arc) {
@@ -3543,59 +4582,17 @@ button:disabled {
       return 0.45 + value * 0.55;
     };
   }
-  var SYSTEMS = {
-    current,
-    radiance,
-    strata,
-    fracture,
-    constellation,
-    lattice,
-    growth
-  };
-  function layGround(env) {
-    const { ctx, width, height, palette, genome } = env;
-    ctx.fillStyle = palette.ground;
-    ctx.fillRect(0, 0, width, height);
-    const angle = genome.baseHue * (Math.PI / 180);
-    const wash = ctx.createLinearGradient(
-      width / 2 - Math.cos(angle) * width * 0.6,
-      height / 2 - Math.sin(angle) * height * 0.6,
-      width / 2 + Math.cos(angle) * width * 0.6,
-      height / 2 + Math.sin(angle) * height * 0.6
-    );
-    wash.addColorStop(0, palette.marks[0] ?? palette.veil);
-    wash.addColorStop(1, palette.ground);
-    ctx.globalAlpha = 0.16 + genome.arousal * 0.1;
-    ctx.fillStyle = wash;
-    ctx.fillRect(0, 0, width, height);
-    ctx.globalAlpha = 1;
-  }
-  function applyFinish(env) {
-    const { ctx, width, height, genome, palette, rng } = env;
-    const vignette = ctx.createRadialGradient(
-      width / 2,
-      height / 2,
-      Math.min(width, height) * 0.25,
-      width / 2,
-      height / 2,
-      Math.max(width, height) * 0.78
-    );
-    vignette.addColorStop(0, "hsl(0 0% 0% / 0)");
-    vignette.addColorStop(1, palette.nocturne ? "hsl(0 0% 0% / 0.55)" : "hsl(0 0% 12% / 0.24)");
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, width, height);
-    const strength = genome.grain;
-    if (strength <= 0.02) return;
-    const image = ctx.getImageData(0, 0, width, height);
-    const data = image.data;
-    const amount = strength * 26;
-    for (let i = 0; i < data.length; i += 4) {
-      const n = (rng.next() - 0.5) * amount;
-      data[i] = Math.max(0, Math.min(255, data[i] + n));
-      data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n));
-      data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + n));
-    }
-    ctx.putImageData(image, 0, 0);
+  function biasGenome(genome, style) {
+    if (!style.bias) return genome;
+    const clamp4 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+    return {
+      ...genome,
+      density: clamp4(genome.density * (style.bias.density ?? 1)),
+      turbulence: clamp4(genome.turbulence * (style.bias.turbulence ?? 1)),
+      weight: clamp4(genome.weight * (style.bias.weight ?? 1)),
+      symmetry: clamp4(genome.symmetry * (style.bias.symmetry ?? 1)),
+      gravity: clamp4(genome.gravity * (style.bias.gravity ?? 1))
+    };
   }
   function render(canvas, genome, options) {
     const { width, height } = options;
@@ -3603,47 +4600,86 @@ button:disabled {
     canvas.height = height;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) throw new Error("Canvas 2D context unavailable in this browser.");
-    const rng = makeRng(genome.seed);
+    const style = STYLE_BY_KEY.get(genome.style) ?? STYLE_BY_KEY.values().next().value;
+    const treatment = TREATMENT_BY_KEY.get(style.treatment);
+    const engine = ENGINE_BY_KEY.get(style.engine);
+    if (!engine) throw new Error(`Unknown engine "${style.engine}".`);
+    const biased = biasGenome(genome, style);
+    const rng = makeRng(biased.seed);
+    const noise = makeNoise2D(biased.seed ^ 1542469173);
     const palette = buildPalette({
-      baseHue: genome.baseHue,
-      harmony: genome.harmony,
-      valence: genome.valence,
-      arousal: genome.arousal,
-      forceNocturne: genome.forceNocturne,
-      brightness: genome.brightness,
+      baseHue: biased.baseHue,
+      harmony: biased.harmony,
+      valence: biased.valence,
+      arousal: biased.arousal,
+      forceNocturne: biased.forceNocturne,
+      brightness: biased.brightness,
+      lightnessShift: treatment.groundShift?.lightness,
+      saturationShift: treatment.groundShift?.saturation,
       rng
     });
-    const env = {
-      ctx,
+    const scene = createScene();
+    const unit = Math.min(width, height);
+    const engineEnv = {
       width,
       height,
-      unit: Math.min(width, height),
-      palette,
-      genome,
+      unit,
+      scene,
       rng,
-      noise: makeNoise2D(genome.seed ^ 1542469173),
-      arcAt: makeArcSampler(genome.arc)
+      noise,
+      genome: biased,
+      arcAt: makeArcSampler(biased.arc)
     };
-    layGround(env);
-    const iterator = SYSTEMS[genome.system](env);
+    const paintEnv = { ctx, width, height, unit, palette };
+    layGround(paintEnv, biased.baseHue, biased.arousal);
+    const iterator = engine.run(engineEnv);
     let cancelled = false;
     let frame = 0;
-    const done = new Promise((resolve) => {
+    let stage = "geometry";
+    let marks = [];
+    let painted = 0;
+    const done = new Promise((resolve, reject) => {
       const step = () => {
         if (cancelled) return;
-        const deadline = performance.now() + 12;
-        let result = iterator.next();
-        while (!result.done && performance.now() < deadline) {
-          result = iterator.next();
+        try {
+          if (stage === "geometry") {
+            const deadline = performance.now() + 12;
+            let result = iterator.next();
+            while (!result.done && performance.now() < deadline) {
+              result = iterator.next();
+            }
+            options.onProgress?.(Math.min(0.55, (result.value || 0) * 0.55));
+            if (result.done) stage = "transform";
+          } else if (stage === "transform") {
+            marks = treatment.transform ? treatment.transform(scene.marks, { unit, rng, noise, genome: biased }) : scene.marks;
+            if (treatment.paint?.glows !== false && (treatment.paint?.glows ?? false)) {
+              paintGlows(paintEnv, scene);
+            }
+            options.onProgress?.(0.6);
+            stage = "paint";
+          } else if (stage === "paint") {
+            painted = paintMarks(paintEnv, marks, treatment.paint ?? {}, painted, 12);
+            const ratio = marks.length > 0 ? painted / marks.length : 1;
+            options.onProgress?.(0.6 + ratio * 0.35);
+            if (painted >= marks.length) stage = "finish";
+          } else {
+            treatment.finish?.({
+              ctx,
+              width,
+              height,
+              unit,
+              rng,
+              genome: biased,
+              nocturne: palette.nocturne
+            });
+            options.onProgress?.(1);
+            resolve({ marks, scene, palette, style, treatment, genome: biased });
+            return;
+          }
+          frame = requestAnimationFrame(step);
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error("Rendering failed."));
         }
-        options.onProgress?.(result.done ? 1 : Math.min(0.99, result.value || 0));
-        if (result.done) {
-          applyFinish(env);
-          options.onProgress?.(1);
-          resolve();
-          return;
-        }
-        frame = requestAnimationFrame(step);
       };
       frame = requestAnimationFrame(step);
     });
@@ -3982,16 +5018,16 @@ button:disabled {
         rms += s * s;
       }
       rms = Math.sqrt(rms / (FRAME / 8));
-      const centroid = sum > 0 ? weighted / sum : 0;
+      const centroid2 = sum > 0 ? weighted / sum : 0;
       const arithmetic = sum / bins;
       const geometric = Math.exp(logSum / bins);
       const flatness = arithmetic > 0 ? geometric / arithmetic : 0;
       rmsFrames.push(rms);
-      centroids.push(centroid);
+      centroids.push(centroid2);
       flatnesses.push(flatness);
       fluxes.push(flux2);
       onsets.push(flux2);
-      superCentroid += centroid / 5e3;
+      superCentroid += centroid2 / 5e3;
       superFlatness += flatness;
       superCount += 1;
       if (superCount >= superFrameSize) {
@@ -4045,10 +5081,10 @@ button:disabled {
     const brightness = clamp3((Math.log2(meanCentroid + 20) - Math.log2(120)) / (Math.log2(5200) - Math.log2(120)), 0, 1);
     const roughness = clamp3(mean(flatnesses) * 3.2, 0, 1);
     const flux = clamp3(fluxAvg / (fluxPeak * 0.35), 0, 1);
-    const arcPoints = 64;
+    const arcPoints2 = 64;
     const arc = [];
-    const bucket = Math.max(1, Math.floor(rmsFrames.length / arcPoints));
-    for (let i = 0; i < arcPoints; i += 1) {
+    const bucket = Math.max(1, Math.floor(rmsFrames.length / arcPoints2));
+    for (let i = 0; i < arcPoints2; i += 1) {
       const slice = rmsFrames.slice(i * bucket, (i + 1) * bucket);
       arc.push(slice.length > 0 ? mean(slice) : 0);
     }
@@ -4209,6 +5245,10 @@ button:disabled {
     const verdictEl = must("verdict");
     const systemName = must("system-name");
     const systemDescription = must("system-description");
+    const treatmentName = must("treatment-name");
+    const treatmentDescription = must("treatment-description");
+    const plotFlag = must("plot-flag");
+    const styleSelect = must("style-select");
     const notesEl = must("notes");
     const themesEl = must("themes");
     const metricsEl = must("metrics");
@@ -4361,8 +5401,12 @@ button:disabled {
         );
       }
       verdictEl.textContent = reading.verdict;
-      systemName.textContent = reading.systemLabel;
+      systemName.textContent = reading.styleLabel;
       systemDescription.textContent = reading.systemDescription;
+      treatmentName.textContent = reading.treatmentLabel;
+      treatmentDescription.textContent = reading.treatmentDescription;
+      plotFlag.textContent = reading.plottable ? "Plotter-safe \u2014 this style is drawn entirely in strokes." : "Screen only \u2014 this style depends on glow or screening a pen cannot draw.";
+      plotFlag.classList.toggle("is-plottable", reading.plottable);
       notesEl.replaceChildren();
       for (const note of reading.notes) {
         const li = document.createElement("li");
@@ -4386,7 +5430,7 @@ button:disabled {
     function paint() {
       if (!subject) return;
       activeRender?.cancel();
-      const genome = interpret(subject.analysis, audio, subject.variation);
+      const genome = interpret(subject.analysis, audio, subject.variation, styleSelect.value || void 0);
       const format = FORMATS[formatSelect.value] ?? FORMATS.portrait;
       renderReading(subject.analysis, genome, subject);
       frameEmpty.hidden = true;
@@ -4401,7 +5445,7 @@ button:disabled {
       plate.append(plateTitle);
       plate.append(
         document.createTextNode(
-          ` \xB7 ${genome.system} \xB7 ${format.label} \xB7 ${genome.heard ? "heard + read" : "read only"} \xB7 seed ${genome.seed.toString(16)}` + (subject.variation > 0 ? ` \xB7 var ${subject.variation}` : "")
+          ` \xB7 ${genome.style} \xB7 ${format.label} \xB7 ${genome.heard ? "heard + read" : "read only"} \xB7 seed ${genome.seed.toString(16)}` + (subject.variation > 0 ? ` \xB7 var ${subject.variation}` : "")
         )
       );
       activeRender = render(canvas, genome, {
@@ -4416,6 +5460,10 @@ button:disabled {
         progress.hidden = true;
         revariate.disabled = false;
         download.disabled = false;
+        styleSelect.disabled = false;
+      }).catch((error) => {
+        progress.hidden = true;
+        setStatus(error instanceof Error ? error.message : "Rendering failed.", "error");
       });
     }
     function readLyrics(text, descriptor) {
@@ -4505,6 +5553,29 @@ button:disabled {
       paint();
     });
     formatSelect.addEventListener("change", () => {
+      if (subject) paint();
+    });
+    {
+      const byEngine = /* @__PURE__ */ new Map();
+      for (const style of STYLES) {
+        const bucket = byEngine.get(style.engine) ?? [];
+        bucket.push(style);
+        byEngine.set(style.engine, bucket);
+      }
+      for (const [engineKey, styles] of byEngine) {
+        const group = document.createElement("optgroup");
+        group.label = ENGINE_BY_KEY.get(engineKey)?.label ?? engineKey;
+        for (const style of styles) {
+          const option = document.createElement("option");
+          option.value = style.key;
+          const treatment = TREATMENT_BY_KEY.get(style.treatment);
+          option.textContent = `${style.name} \xB7 ${treatment?.label ?? style.treatment}${treatment?.plottable ? "" : " (screen)"}`;
+          group.append(option);
+        }
+        styleSelect.append(group);
+      }
+    }
+    styleSelect.addEventListener("change", () => {
       if (subject) paint();
     });
     function setAudioStatus(message, tone = "idle") {

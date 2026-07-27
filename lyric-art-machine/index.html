@@ -89,9 +89,14 @@
             <h2 class="verdict" id="verdict"></h2>
 
             <div class="system-card">
-              <span class="system-eyebrow">Visual system</span>
+              <span class="system-eyebrow">Style</span>
               <strong class="system-name" id="system-name"></strong>
               <p class="system-description" id="system-description"></p>
+              <p class="treatment-line">
+                <span class="treatment-name" id="treatment-name"></span>
+                <span class="treatment-description" id="treatment-description"></span>
+              </p>
+              <p class="plot-flag" id="plot-flag"></p>
             </div>
 
             <section class="reading-block" id="heard-block" hidden>
@@ -134,6 +139,12 @@
           </div>
 
           <div class="gallery-controls">
+            <label class="select-field">
+              <span>Style</span>
+              <select id="style-select" disabled>
+                <option value="">Machine's choice</option>
+              </select>
+            </label>
             <button type="button" class="secondary" id="revariate" disabled>New variation</button>
             <label class="select-field">
               <span>Format</span>

@@ -11,6 +11,9 @@ import { analyze, type SongAnalysis } from '../analysis/analyze';
 import { explain, interpret, type ArtGenome } from '../analysis/interpret';
 import { acquire, type LyricsResult, type TrackGuess, type VideoMeta } from '../lyrics';
 import { render, type RenderHandle } from '../art/renderer';
+import { STYLES } from '../art/catalog';
+import { ENGINE_BY_KEY } from '../art/engines';
+import { TREATMENT_BY_KEY } from '../art/treatments';
 import { decodeBlob, decodeFile } from '../audio/decode';
 import { extractFeatures } from '../audio/features';
 import { captureTabAudio, tabCaptureSupported, type CaptureSession } from '../audio/live';
@@ -95,6 +98,10 @@ export function mountApp(): void {
   const verdictEl = must<HTMLElement>('verdict');
   const systemName = must<HTMLElement>('system-name');
   const systemDescription = must<HTMLElement>('system-description');
+  const treatmentName = must<HTMLElement>('treatment-name');
+  const treatmentDescription = must<HTMLElement>('treatment-description');
+  const plotFlag = must<HTMLElement>('plot-flag');
+  const styleSelect = must<HTMLSelectElement>('style-select');
   const notesEl = must<HTMLUListElement>('notes');
   const themesEl = must<HTMLUListElement>('themes');
   const metricsEl = must<HTMLElement>('metrics');
@@ -274,8 +281,14 @@ export function mountApp(): void {
     }
 
     verdictEl.textContent = reading.verdict;
-    systemName.textContent = reading.systemLabel;
+    systemName.textContent = reading.styleLabel;
     systemDescription.textContent = reading.systemDescription;
+    treatmentName.textContent = reading.treatmentLabel;
+    treatmentDescription.textContent = reading.treatmentDescription;
+    plotFlag.textContent = reading.plottable
+      ? 'Plotter-safe — this style is drawn entirely in strokes.'
+      : 'Screen only — this style depends on glow or screening a pen cannot draw.';
+    plotFlag.classList.toggle('is-plottable', reading.plottable);
 
     notesEl.replaceChildren();
     for (const note of reading.notes) {
@@ -308,7 +321,7 @@ export function mountApp(): void {
 
     activeRender?.cancel();
 
-    const genome = interpret(subject.analysis, audio, subject.variation);
+    const genome = interpret(subject.analysis, audio, subject.variation, styleSelect.value || undefined);
     const format = FORMATS[(formatSelect.value as FormatKey)] ?? FORMATS.portrait;
 
     renderReading(subject.analysis, genome, subject);
@@ -326,7 +339,7 @@ export function mountApp(): void {
     plate.append(plateTitle);
     plate.append(
       document.createTextNode(
-        ` · ${genome.system} · ${format.label} · ${genome.heard ? 'heard + read' : 'read only'}` +
+        ` · ${genome.style} · ${format.label} · ${genome.heard ? 'heard + read' : 'read only'}` +
           ` · seed ${genome.seed.toString(16)}` +
           (subject.variation > 0 ? ` · var ${subject.variation}` : ''),
       ),
@@ -346,6 +359,10 @@ export function mountApp(): void {
       progress.hidden = true;
       revariate.disabled = false;
       download.disabled = false;
+      styleSelect.disabled = false;
+    }).catch((error: unknown) => {
+      progress.hidden = true;
+      setStatus(error instanceof Error ? error.message : 'Rendering failed.', 'error');
     });
   }
 
@@ -467,6 +484,37 @@ export function mountApp(): void {
   });
 
   formatSelect.addEventListener('change', () => {
+    if (subject) paint();
+  });
+
+  // ---------------------------------------------------------------- styles
+
+  // Grouped by engine so the list reads as a catalogue rather than 76 flat rows.
+  {
+    const byEngine = new Map<string, typeof STYLES>();
+    for (const style of STYLES) {
+      const bucket = byEngine.get(style.engine) ?? [];
+      bucket.push(style);
+      byEngine.set(style.engine, bucket);
+    }
+    for (const [engineKey, styles] of byEngine) {
+      const group = document.createElement('optgroup');
+      group.label = ENGINE_BY_KEY.get(engineKey)?.label ?? engineKey;
+      for (const style of styles) {
+        const option = document.createElement('option');
+        option.value = style.key;
+        const treatment = TREATMENT_BY_KEY.get(style.treatment);
+        // Mark screen-only styles so the plotter case is obvious at a glance.
+        option.textContent = `${style.name} · ${treatment?.label ?? style.treatment}${
+          treatment?.plottable ? '' : ' (screen)'
+        }`;
+        group.append(option);
+      }
+      styleSelect.append(group);
+    }
+  }
+
+  styleSelect.addEventListener('change', () => {
     if (subject) paint();
   });
 

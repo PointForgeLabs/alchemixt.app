@@ -13,18 +13,13 @@ import type { SongAnalysis } from './analyze';
 import type { ThemeKey } from './lexicons';
 import type { AudioFeatures } from '../audio/types';
 import type { Harmony } from '../art/color';
-
-export type SystemKey =
-  | 'current'
-  | 'radiance'
-  | 'strata'
-  | 'fracture'
-  | 'constellation'
-  | 'lattice'
-  | 'growth';
+import { chooseStyle, STYLE_BY_KEY, type Style } from '../art/catalog';
+import { ENGINE_BY_KEY } from '../art/engines';
+import { TREATMENT_BY_KEY } from '../art/treatments';
 
 export interface ArtGenome {
-  system: SystemKey;
+  /** Key into the style catalogue — engine plus treatment. */
+  style: string;
   seed: number;
   baseHue: number;
   harmony: Harmony;
@@ -64,62 +59,39 @@ export interface Reading {
   notes: string[];
   /** Separate bullets for what the machine heard, when it heard anything. */
   heardNotes: string[];
-  systemLabel: string;
+  /** Style name, e.g. "Rootstock". */
+  styleLabel: string;
+  /** What the engine does structurally. */
   systemDescription: string;
+  /** Treatment name, e.g. "Woodcut". */
+  treatmentLabel: string;
+  /** What the treatment does to the marks. */
+  treatmentDescription: string;
+  /** Whether a pen plotter can reproduce this style honestly. */
+  plottable: boolean;
 }
 
-const SYSTEM_BY_THEME: Record<ThemeKey, SystemKey> = {
-  motion: 'current',
-  water: 'current',
-  transcendence: 'radiance',
-  fire: 'radiance',
-  love: 'radiance',
-  memory: 'strata',
-  loss: 'strata',
-  defiance: 'fracture',
-  night: 'constellation',
-  city: 'lattice',
-  nature: 'growth',
-  body: 'growth',
-};
-
-const SYSTEM_INFO: Record<SystemKey, { label: string; description: string }> = {
-  current: {
-    label: 'Current',
-    description:
-      'Thousands of particles released into a noise field, each tracing where the song pushes it. Nothing is placed; everything is carried.',
-  },
-  radiance: {
-    label: 'Radiance',
-    description:
-      'Everything organized around a single luminous center — rays, arcs, and orbits that either resolve into a halo or burn out at the edges.',
-  },
-  strata: {
-    label: 'Strata',
-    description:
-      'The image laid down in horizontal bands, like sediment or a stack of exposures. Older layers show through the newer ones.',
-  },
-  fracture: {
-    label: 'Fracture',
-    description:
-      'The picture plane broken into shards and driven apart along hard diagonals. Each fragment keeps a piece of the original field.',
-  },
-  constellation: {
-    label: 'Constellation',
-    description:
-      'Points of light scattered across a dark ground, with faint lines drawn between the ones that belong together.',
-  },
-  lattice: {
-    label: 'Lattice',
-    description:
-      'A rigid grid imposed on the canvas, then made to carry something it was not built for. The structure holds, but not evenly.',
-  },
-  growth: {
-    label: 'Growth',
-    description:
-      'Branching forms grown from seed points, splitting and thinning until they run out of energy.',
-  },
-};
+/** Describes a style for display, tolerating an unknown key. */
+function describeStyle(key: string): {
+  style: Style | null;
+  label: string;
+  system: string;
+  treatmentLabel: string;
+  treatmentDescription: string;
+  plottable: boolean;
+} {
+  const style = STYLE_BY_KEY.get(key) ?? null;
+  const engine = style ? ENGINE_BY_KEY.get(style.engine) : undefined;
+  const treatment = style ? TREATMENT_BY_KEY.get(style.treatment) : undefined;
+  return {
+    style,
+    label: style?.name ?? 'Unknown',
+    system: engine?.description ?? '',
+    treatmentLabel: treatment?.label ?? '',
+    treatmentDescription: treatment?.description ?? '',
+    plottable: treatment?.plottable ?? false,
+  };
+}
 
 /** Where each theme anchors the palette when the lyrics name no colors. */
 const HUE_BY_THEME: Record<ThemeKey, number> = {
@@ -136,11 +108,6 @@ const HUE_BY_THEME: Record<ThemeKey, number> = {
   water: 202,
   fire: 24,
 };
-
-/** Systems that read as calm — candidates for an audio override when the music is violent. */
-const CALM_SYSTEMS = new Set<SystemKey>(['strata', 'constellation', 'growth', 'radiance']);
-/** Systems that read as agitated — replaced when the music turns out to be still. */
-const AGITATED_SYSTEMS = new Set<SystemKey>(['fracture', 'lattice', 'current']);
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
@@ -218,25 +185,45 @@ function audioSeed(audio: AudioFeatures): number {
   return h >>> 0;
 }
 
+/**
+ * Selects a style from the catalogue. Split out because the reading needs to
+ * compare what the lyrics alone would have chosen against the final answer.
+ */
+export function selectStyle(
+  analysis: SongAnalysis,
+  audio: AudioFeatures | null,
+  seed: number,
+): { chosen: string; fromLyricsAlone: string } {
+  const themes = analysis.themes.map((t) => ({ key: t.key, strength: t.strength }));
+
+  const lyricEnergy = analysis.arousal;
+  const lyricGrit = clamp(analysis.arousal * 0.5 + Math.max(0, -analysis.valence) * 0.5, 0, 1);
+  const fromLyricsAlone = chooseStyle(themes, lyricEnergy, lyricGrit, seed).key;
+
+  if (!audio) return { chosen: fromLyricsAlone, fromLyricsAlone };
+
+  // Audio is far better evidence for how hard a song hits and how rough it
+  // sounds, which is exactly what separates one treatment from another.
+  const heardEnergy = clamp(
+    audio.energy * 0.45 + clamp((audio.tempo - 60) / 120, 0, 1) * 0.3 + audio.onsetDensity * 0.25,
+    0,
+    1,
+  );
+  const heardGrit = clamp(audio.roughness * 0.7 + (1 - audio.dynamicRange) * 0.3, 0, 1);
+
+  return { chosen: chooseStyle(themes, heardEnergy, heardGrit, seed).key, fromLyricsAlone };
+}
+
 export function interpret(
   analysis: SongAnalysis,
   audio: AudioFeatures | null,
   variation = 0,
+  forcedStyle?: string,
 ): ArtGenome {
   const dominant = analysis.themes[0];
   const dominantKey: ThemeKey = dominant && dominant.strength > 0 ? dominant.key : 'memory';
   const second = analysis.themes[1];
   const secondStrength = second?.strength ?? 0;
-
-  // ---- system: lyrics choose the subject, audio can overrule on temperament ----
-  let system = SYSTEM_BY_THEME[dominantKey];
-  if (audio) {
-    if (aggression(audio) > 0.72 && CALM_SYSTEMS.has(system)) {
-      system = 'fracture';
-    } else if (stillness(audio) > 0.72 && AGITATED_SYSTEMS.has(system)) {
-      system = dominantKey === 'city' ? 'strata' : 'constellation';
-    }
-  }
 
   // ---- emotional register ----
   // Mode is the single strongest musical signal of brightness or sadness, so it
@@ -266,10 +253,16 @@ export function interpret(
   }
 
   const seedBase = audio ? (analysis.fingerprint ^ audioSeed(audio)) >>> 0 : analysis.fingerprint;
+  const seed = (seedBase ^ Math.imul(variation + 1, 0x9e3779b9)) >>> 0;
+
+  // A style picked by hand always wins; the machine only chooses when asked to.
+  const style = forcedStyle && STYLE_BY_KEY.has(forcedStyle)
+    ? forcedStyle
+    : selectStyle(analysis, audio, seedBase).chosen;
 
   return {
-    system,
-    seed: (seedBase ^ Math.imul(variation + 1, 0x9e3779b9)) >>> 0,
+    style,
+    seed,
     baseHue,
     harmony: pickHarmony(analysis, dominantKey, audio),
     valence,
@@ -355,7 +348,7 @@ export function explain(
   genome: ArtGenome,
   audio: AudioFeatures | null,
 ): Reading {
-  const info = SYSTEM_INFO[genome.system];
+  const info = describeStyle(genome.style);
   const dominant = analysis.themes[0];
   const second = analysis.themes[1];
   const notes: string[] = [];
@@ -453,14 +446,17 @@ export function explain(
       );
     }
 
-    const systemFromLyrics = dominant && dominant.strength > 0
-      ? SYSTEM_BY_THEME[dominant.key]
-      : 'strata';
-    if (systemFromLyrics !== genome.system) {
+    const { fromLyricsAlone } = selectStyle(analysis, audio, genome.seed);
+    if (fromLyricsAlone !== genome.style) {
+      const alternative = describeStyle(fromLyricsAlone);
       heardNotes.push(
-        `The words alone would have produced ${SYSTEM_INFO[systemFromLyrics].label}, but the music is too ${
-          aggression(audio) > 0.6 ? 'violent' : 'still'
-        } for that, so the machine overruled the lyrics and used ${info.label}.`,
+        `The words alone would have produced ${alternative.label}, but the music is ${
+          aggression(audio) > 0.6
+            ? 'harder and rougher'
+            : stillness(audio) > 0.6
+              ? 'stiller'
+              : 'weighted differently'
+        } than they are, so the machine chose ${info.label} instead.`,
       );
     }
 
@@ -480,7 +476,10 @@ export function explain(
     verdict,
     notes,
     heardNotes,
-    systemLabel: info.label,
-    systemDescription: info.description,
+    styleLabel: info.label,
+    systemDescription: info.system,
+    treatmentLabel: info.treatmentLabel,
+    treatmentDescription: info.treatmentDescription,
+    plottable: info.plottable,
   };
 }
