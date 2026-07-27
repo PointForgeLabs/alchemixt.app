@@ -98,7 +98,7 @@ async function _renderPlate({ quick = false } = {}) {
         // Rebuild once and retry before troubling the user.
         if (!renderer.contextLost || attempt >= 1) throw err;
         setStatus('GPU driver reset — retrying with smaller tiles…', 0);
-        const budget = Math.max(4096, Math.floor(renderer.tileBudget));
+        const budget = Math.max(4096, Math.floor(renderer.tilePixels));
         try { renderer.dispose(); } catch { /* the context is already gone */ }
         renderer = new SkullRenderer({ tileBudget: budget });
       }
@@ -307,8 +307,23 @@ async function boot() {
       || (renderer.config ? renderer.config.id : 'none'),
     glContext: () => renderer.gl,
     reprobe: () => renderer._probeMatrix(64, 64),
-    probeTargets: (w, h) => renderer._prepare(w, h * 4, h),
-    tileBudget: () => renderer.tileBudget,
+    // Renders straight through the renderer with no app-level recovery, so a
+    // test can see the raw diagnosis rather than the recovered result.
+    renderRaw: (overrides = {}) => {
+      const p = applyStylePreset({ ...state, ...overrides });
+      return renderer.render({ width: 96, height: 96, params: { ...p, framingMm: 250, seedNum: 1 }, bandRows: 64 });
+    },
+    tileBudget: () => renderer.tilePixels,
+    allocation: () => renderer.alloc,
+    markBuildBaseline: () => {
+      window.__mmBaseline = { builds: renderer._buildCount || 0, renders: 0 };
+      return window.__mmBaseline.builds;
+    },
+    buildCount: () => ({
+      baseline: window.__mmBaseline ? window.__mmBaseline.builds : 0,
+      after: renderer._buildCount || 0,
+      renders: renderToken,
+    }),
     gpu: () => ({ ...renderer.debugInfo, probeResult: renderer.probe, configs: renderer.configs.map((c) => c.short) }),
     bounds: () => {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;

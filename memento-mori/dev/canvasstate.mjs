@@ -61,6 +61,7 @@ const sizes = [
   { page: 'a6', renderScale: 0.7 },
   { page: 'a5', renderScale: 0.4 },
 ];
+const baseline = await page.evaluate(() => window.__mm.markBuildBaseline());
 for (const s of sizes) {
   const r = await page.evaluate(async (o) => {
     try {
@@ -79,6 +80,17 @@ for (const s of sizes) {
               `strokes=${r.ok ? r.strokes : '—'}  drawingBuffer=${r.cw}x${r.ch}` +
               (untouched ? '' : '  <-- CANVAS WAS RESIZED') + (r.ok ? '' : `  ${r.error}`));
 }
+
+// The invariant that matters most: nothing is reallocated after startup.
+// Reallocating render targets mid-session is what failed on Intel Iris Xe, so the
+// renderer claims them once and addresses sub-rectangles of that one buffer
+// thereafter. This asserts the GL-object count never moves.
+const allocs = await page.evaluate(() => window.__mm.buildCount());
+if (allocs.after !== allocs.baseline) failures++;
+console.log(`  ${allocs.after === allocs.baseline ? 'ok  ' : 'FAIL'}  ` +
+            `render targets allocated once: ${allocs.baseline} at boot, ` +
+            `${allocs.after} after ${allocs.renders} renders` +
+            (allocs.after === allocs.baseline ? '' : '  <-- REALLOCATED'));
 
 // And allocation must still be healthy after all that.
 const live = await page.evaluate(() => {

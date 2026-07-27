@@ -114,7 +114,18 @@ node dev/regression.mjs                # allocations that stop working mid-rende
 node dev/canvasstate.mjs               # drawing buffer untouched, context stays healthy
 node dev/checks.mjs                    # 19 awkward parameter combinations
 node dev/bundle.mjs out.html           # single-file build for file://
+node dev/standalone.mjs [out.html]     # drive that build over a real file:// URL
 ```
+
+`dev/standalone.mjs` is the one that matters before handing the single file to
+anyone: it opens the bundle from disk rather than from a server, and it runs the
+two driver faults that have actually been reported — allocation that works at
+boot and is refused afterwards, and a driver that refuses anything wide — as
+well as the healthy path. The bundler refuses to emit a file that references any
+`http(s)` URL, so the page opens with the machine offline; the webfonts are
+dropped and the CSS falls back to Georgia / system-ui / ui-monospace. Nothing
+about the plate depends on them, because the lettering uses the built-in
+single-stroke font.
 
 The probe sheet renders the raw G-buffer — luminance, normal, depth, region,
 form field, occlusion — side by side, which is the fastest way to see whether an
@@ -157,6 +168,29 @@ WebGL2 with `EXT_color_buffer_float` (or `EXT_color_buffer_half_float`). That
 covers current desktop and mobile browsers; the app reports a clear error rather
 than degrading if it is missing.
 
+### Render targets are allocated once and never reallocated
+
+The renderer claims one framebuffer at construction — while allocation
+demonstrably works — and keeps it for the life of the context. Every render then
+addresses a sub-rectangle of that one buffer: both `glViewport` and `readPixels`
+take a rectangle, so any effective tile up to the allocated size can be used and
+retuned per render without touching a single GL object.
+
+This is not an optimisation. Reallocating render targets *after rendering has
+begun* fails outright on some drivers: on Intel Iris Xe via ANGLE/D3D11,
+allocations that succeeded moments earlier start returning
+`FRAMEBUFFER_UNSUPPORTED` at **every** size and **every** pixel format, while
+`isContextLost()` still reports `false`. An earlier design reallocated on every
+plate-size change and every timing retune, and lost that coin flip every time.
+
+Consequences worth preserving:
+
+- tile timing tunes the *next* render, never the current one — retuning mid-render
+  used to restart it, and a restart means reallocating;
+- the canvas is never resized either (see below);
+- `dev/canvasstate.mjs` asserts the GL-object count is identical after five
+  renders at four different raster sizes. That test is the guard on all of this.
+
 ### The canvas is never resized
 
 The renderer draws only to framebuffer objects and reads them back with
@@ -187,21 +221,19 @@ So the renderer:
 
 - caps the pixels in one draw (`DEFAULT_TILE_PIXELS`), tiling the raster in
   columns as well as bands, and calibrates that budget from a measured tile to
-  target ~120 ms per draw;
+  target ~120 ms per draw — the calibration is pure arithmetic against the buffer
+  already allocated, so it applies to the *next* render and allocates nothing;
 - checks `isContextLost()` before blaming the framebuffer configuration;
-- rebuilds itself once and retries when the context is lost, halving the tile
+- rebuilds itself once and retries when the context is lost, cutting the tile
   budget, rather than surfacing a dead renderer;
-- searches tile sizes with a descending ladder rather than a bisection, because
-  a bisection assumes one monotonic size threshold and can conclude nothing works
-  while never trying sizes that do;
-- grows the budget by at most 2× at a time, and falls back to the last tile size
-  that actually drew if a larger one is refused — allocations really do stop
-  succeeding part-way through a render, and growth must never break a render that
-  was already working.
+- searches allocation sizes with a descending ladder rather than a bisection,
+  because a bisection assumes one monotonic size threshold and can conclude
+  nothing works while never trying sizes that do.
 
-`dev/regression.mjs` reproduces that last signature directly: allocation that
-succeeds and is then refused, which is the failure mode a naive "find the limit
-once" search cannot survive.
+`dev/regression.mjs` reproduces the nastiest reported signature directly:
+allocation that succeeds and is then refused. `dev/standalone.mjs` runs the same
+fault against the single-file build and asserts it is now a non-event — the
+render path never asks for memory, so there is nothing left to refuse.
 
 The stats panel shows the active configuration and tile size. If you see a driver
 reset repeatedly, lower **Render detail** or raise **Engraving pitch** — both cut

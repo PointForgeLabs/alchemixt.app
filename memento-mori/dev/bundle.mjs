@@ -109,6 +109,12 @@ html = html
   .replace(/^\s*<link rel="icon"[^>]*>\n/m, '')
   .replace(/^\s*<link rel="canonical"[^>]*>\n/m, '')
   .replace(/\s*<a class="home"[\s\S]*?<\/a>\n/, '\n')
+  // The webfonts are UI chrome only -- the plate is lettered with the built-in
+  // single-stroke font. A file you downloaded should not need the network to
+  // open, so drop them and let the CSS fall back to Georgia / system-ui /
+  // ui-monospace.
+  .replace(/^\s*<link rel="preconnect"[^>]*>\n/gm, '')
+  .replace(/^\s*<link href="https:\/\/fonts\.googleapis\.com[^>]*>\n/gm, '')
   .replace(
     '<script type="module" src="./js/main.js"></script>',
     `<script>\n${RUNTIME}\n${[...modules.values()].join('\n\n')}\n\n__req('${ENTRY}');\n</script>`
@@ -116,6 +122,11 @@ html = html
 
 if (html.includes('type="module"') || html.includes('src="./js/')) {
   throw new Error('shell still references external scripts');
+}
+// Nothing may reach the network: the file has to open with the machine offline.
+const remote = [...html.matchAll(/(?:href|src)="(https?:\/\/[^"]*)"/g)].map((m) => m[1]);
+if (remote.length) {
+  throw new Error(`shell still fetches from the network:\n  ${remote.join('\n  ')}`);
 }
 
 fs.mkdirSync(path.dirname(outFile), { recursive: true });

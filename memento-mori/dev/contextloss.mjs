@@ -50,11 +50,13 @@ await page.waitForFunction('window.__mm.hasPlate && window.__mm.hasPlate()', { t
 let failures = 0;
 
 // 1. A lost context must be reported as such, not as an unsupported format.
-const diagnosis = await page.evaluate(() => {
+// Driven through the real render path rather than a private helper, so the test
+// cannot drift away from what the app actually does.
+const diagnosis = await page.evaluate(async () => {
   const gl = window.__mm.glContext();
   gl.getExtension('WEBGL_lose_context').loseContext();
   try {
-    window.__mm.probeTargets(1365, 64);
+    await window.__mm.renderRaw({ page: 'a6', renderScale: 0.4 });
     return 'no error';
   } catch (err) {
     return err.message.split('\n')[0];

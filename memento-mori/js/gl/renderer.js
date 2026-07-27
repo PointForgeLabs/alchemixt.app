@@ -124,6 +124,8 @@ const UNIFORM_NAMES = [
  */
 const DEFAULT_TILE_PIXELS = 8192;       // e.g. 128 x 64 -- deliberately timid
 const MAX_TILE_PIXELS = 262144;
+// Allocated once and never changed; the effective tile lives inside it.
+const ALLOC_TILE_PIXELS = 32768;
 const TARGET_TILE_MS = 120;             // well inside any watchdog budget
 
 function contextLostError() {
@@ -206,8 +208,8 @@ export class SkullRenderer {
       ? forced : 0;
     this.configIndex = this.startIndex;
     this.config = null;
-    this.lastGoodTile = null;
-    this.tileBudget = Math.max(4096, Number(opts.tileBudget) || DEFAULT_TILE_PIXELS);
+    this.alloc = null;
+    this.tilePixels = Math.max(4096, Number(opts.tileBudget) || DEFAULT_TILE_PIXELS);
     this.debugInfo = this._describeGpu();
 
     this.program = this._buildProgram();
@@ -240,6 +242,10 @@ export class SkullRenderer {
     if (viable.length) this.configs = viable;
     this.startIndex = Math.min(this.startIndex, this.configs.length - 1);
     this.configIndex = this.startIndex;
+
+    // Claim the render targets now, while allocation demonstrably works, and
+    // never reallocate them again.
+    this._allocateOnce();
   }
 
   _probeMatrix(w, h) {
@@ -317,7 +323,6 @@ export class SkullRenderer {
     this.textures = [];
     this.renderbuffers = [];
     this.drawLists = [];
-    this.tilePlan = null;
     this.tileW = 0;
     this.tileH = 0;
   }
@@ -436,119 +441,60 @@ export class SkullRenderer {
   }
 
   /**
-   * Decide the tile size to render in, and leave targets allocated for it.
+   * Allocate the render targets exactly once, at construction.
    *
-   * The full raster width is tried first. If the driver refuses it -- and some do,
-   * well below any limit they advertise: Intel Iris Xe via ANGLE/D3D11 rejects a
-   * 1365-wide multi-target float framebuffer while accepting 64 wide, with
-   * MAX_RENDERBUFFER_SIZE reporting 16384 -- the largest acceptable width is found
-   * by bisection and the image is rendered in columns as well as bands. The shader
-   * already takes a tile origin, so tiling costs draw calls and nothing else.
+   * This is the whole point of the redesign. Reallocating targets at render time
+   * -- which the previous design did on every plate-size change and every
+   * calibration retune -- fails outright on some drivers once rendering has
+   * begun: allocations that succeeded a moment earlier start returning
+   * FRAMEBUFFER_UNSUPPORTED at every size and format, with isContextLost() still
+   * reporting false. Rather than keep trying to characterise that, nothing is
+   * ever reallocated. One buffer is claimed while we know allocation works, and
+   * it is kept for the life of the context.
+   *
+   * A smaller tile costs nothing: both glViewport and readPixels address a
+   * sub-rectangle of the attachment, so any effective tile up to the allocated
+   * size can be used, changed freely, and tuned per render without touching a
+   * single GL object.
    */
-  _prepare(width, height, bandRows) {
-    if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
-    const band = Math.max(8, Math.min(bandRows, height));
-    // Cap the pixels in a single draw. This is the real defence against a driver
-    // watchdog reset: one band of a large plate is ~90k pixels of very heavy
-    // raymarching, which on integrated graphics can exceed the two-second budget
-    // Windows allows a draw call before it resets the GPU.
-    const budgetW = Math.max(8, Math.min(width, Math.floor(this.tileBudget / band)));
-    const key = `${width}x${band}x${budgetW}`;
-    if (this.tilePlan && this.tilePlan.key === key && this.fbos.length) return this.tilePlan;
-    this._releaseTargets();
-
+  _allocateOnce() {
+    const candidates = [];
+    for (const [w, h] of [
+      [512, 64], [384, 64], [256, 64], [192, 64], [128, 64], [96, 64], [64, 64],
+      [64, 32], [48, 32], [32, 32], [32, 16], [16, 16], [8, 8],
+    ]) {
+      if (w * h <= ALLOC_TILE_PIXELS) candidates.push([w, h]);
+    }
     const rejected = [];
-    // Descending ladder rather than a bisection. A bisection assumes the driver
-    // has one monotonic size threshold; this one does not behave that way, and a
-    // bisection that guesses wrong on its first probe can conclude nothing works
-    // while sizes it never tried are fine. This tries every candidate, largest
-    // first, and stops at the first that is actually complete.
-    const widths = [];
-    const ceiling = Math.min(width, budgetW);
-    for (const w of [ceiling, 1024, 768, 512, 384, 256, 192, 128, 96, 64, 48, 32, 16, 8]) {
-      if (w <= ceiling && w >= 8 && !widths.includes(w)) widths.push(w);
-    }
-    const heights = [];
-    for (const h of [band, 64, 32, 16, 8]) {
-      if (h <= band && h >= 8 && !heights.includes(h)) heights.push(h);
-    }
-    // A size that worked before is worth trying first: it is both likely to work
-    // again and cheaper than walking the ladder from the top.
-    const preferred = this.lastGoodTile;
-    if (preferred && preferred.w <= ceiling) {
-      widths.unshift(preferred.w);
-      if (!heights.includes(preferred.h)) heights.unshift(preferred.h);
-    }
-
-    let chosen = null;
-    outer:
-    for (const h of heights) {
-      for (const w of widths) {
-        if (this._allocateAny(w, h, chosen === null && h === heights[0] ? rejected : null) >= 0) {
-          chosen = { w, h };
-          break outer;
-        }
-        if (this.contextLost) break outer;
+    for (const [w, h] of candidates) {
+      if (this._allocateAny(w, h, rejected.length < 18 ? rejected : null) >= 0) {
+        this.alloc = { w, h };
+        return;
       }
+      if (this.contextLost) break;
     }
+    const d = this.debugInfo;
+    throw new Error(
+      `Could not allocate any render target.\n\n` +
+      `Tried: ${candidates.map(([w, h]) => `${w}x${h}`).join(', ')}\n` +
+      `First-size failures: ${rejected.join('; ')}\n\n` +
+      `GPU: ${d.vendor} / ${d.renderer}\n` +
+      `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
+      `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
+      `float32 ${d.float32}, float16 ${d.float16}\n` +
+      `contextLost ${this.gl.isContextLost()}\n\n` +
+      `64x64 probe: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}`
+    );
+  }
 
-    if (!chosen) {
-      if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
-      // Last resort: if the drawing buffer has been disturbed, put it back and
-      // try once more. A resized canvas can leave ANGLE unable to complete any
-      // framebuffer at all, which is indistinguishable from an unsupported
-      // format until you notice that sizes which worked before now do not.
-      if (this.canvas.width !== 8 || this.canvas.height !== 8) {
-        this.canvas.width = 8;
-        this.canvas.height = 8;
-        while (this.gl.getError() !== this.gl.NO_ERROR) { /* drain */ }
-        for (const h of heights) {
-          for (const w of widths) {
-            if (this._allocateAny(w, h, null) >= 0) { chosen = { w, h }; break; }
-          }
-          if (chosen) break;
-        }
-      }
-    }
-
-    if (!chosen) {
-      // Re-run the startup probe now. If 64x64 has stopped working too then the
-      // context or driver state is the problem, not the size; if it still works,
-      // the refusal really is size-dependent. Those need different fixes, and
-      // guessing between them has cost enough already.
-      const live = this._probeMatrix(64, 64);
-      const d = this.debugInfo;
-      throw new Error(
-        `No usable render-target configuration at ${width}×${band}, and none of ` +
-        `${widths.join('/')} wide by ${heights.join('/')} tall worked either.\n\n` +
-        `Tried at the largest size: ${rejected.join('; ')}\n\n` +
-        `GPU: ${d.vendor} / ${d.renderer}\n` +
-        `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
-        `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
-        `float32 ${d.float32}, float16 ${d.float16}, blendable ${d.floatBlend}\n` +
-        `contextLost ${this.gl.isContextLost()}, tileBudget ${this.tileBudget}, ` +
-        `lastGoodTile ${preferred ? `${preferred.w}x${preferred.h}` : 'none'}\n\n` +
-        `64×64 at startup: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}\n` +
-        `64×64 right now:  ${Object.entries(live).map(([k, v]) => `${k}:${v}`).join(' ')}\n\n` +
-        `Please report this text — the two 64×64 lines say whether the driver ` +
-        `changed its mind or the size is genuinely the issue.`
-      );
-    }
-
-    const { w: tileW, h: tileH } = chosen;
-    this.lastGoodTile = { w: tileW, h: tileH };
-    this.tilePlan = { key, tileW, tileH, tiled: tileW < width || tileH < band };
-
-    // The canvas is deliberately never resized. Nothing is ever drawn to the
-    // default framebuffer -- every pass renders to an FBO and is read back -- so
-    // its size is irrelevant, and the viewport is governed by the attachment, not
-    // by the drawing buffer. Growing it to match the tile (which this used to do,
-    // for no reason at all) makes ANGLE reallocate the D3D11 swap chain, and on
-    // Intel Iris Xe that leaves the context unable to complete *any* subsequent
-    // framebuffer while still reporting isContextLost() === false. The symptom is
-    // FRAMEBUFFER_UNSUPPORTED at every size and format, including sizes that
-    // worked moments earlier.
-    return this.tilePlan;
+  /**
+   * Pick the effective tile for this render. Pure arithmetic against the
+   * already-allocated buffer -- no GL calls, so it cannot fail.
+   */
+  _chooseTile(width, height, bandRows) {
+    const h = Math.max(8, Math.min(this.alloc.h, bandRows, height));
+    const w = Math.max(8, Math.min(this.alloc.w, width, Math.floor(this.tilePixels / h)));
+    return { tileW: w, tileH: h, tiled: w < width || h < height };
   }
 
   /**
@@ -568,17 +514,8 @@ export class SkullRenderer {
     });
     const rot = buildRotation(params.yaw, params.pitch, params.roll);
 
-    let tile;
-    try {
-      tile = this._prepare(width, height, bandRows);
-    } catch (err) {
-      // Growing the budget must never be able to break a render that was already
-      // working. Fall back to the last size that drew, and stop growing.
-      if (!this.lastGoodTile || this.gl.isContextLost()) throw err;
-      this.tileBudget = Math.max(4096, this.lastGoodTile.w * this.lastGoodTile.h);
-      this._noGrow = true;
-      tile = this._prepare(width, height, bandRows);
-    }
+    if (gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
+    const tile = this._chooseTile(width, height, bandRows);
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
@@ -637,8 +574,8 @@ export class SkullRenderer {
     const n = width * height;
     const fields = {
       width, height, cam, rot,
-      targetConfig: this.config.id +
-        (tile.tiled ? ` · ${tile.tileW}×${tile.tileH} tiles` : ''),
+      targetConfig: `${this.config.id} · ${tile.tileW}×${tile.tileH} tiles ` +
+        `in ${this.alloc.w}×${this.alloc.h}`,
       depth: new Float32Array(n),
       nx: new Float32Array(n), ny: new Float32Array(n), nz: new Float32Array(n),
       lum: new Float32Array(n), ao: new Float32Array(n),
@@ -649,7 +586,8 @@ export class SkullRenderer {
       mottle: new Float32Array(n),
     };
 
-    const scratch = new Float32Array(tile.tileW * tile.tileH * 4);
+    // Sized by the allocation, since the tile may address only part of it.
+    const scratch = new Float32Array(this.alloc.w * this.alloc.h * 4);
     const cols = Math.ceil(width / tile.tileW);
     const rows = Math.ceil(height / tile.tileH);
     const total = cols * rows;
@@ -657,8 +595,7 @@ export class SkullRenderer {
     let lastYield = performance.now();
 
     const { attachments, passes } = this.config;
-    let calibrated = false;
-    this._calibrations = (this._calibrations || 0);
+    let slowestTile = 0;
     for (let ry = 0; ry < rows; ry++) {
       const y0 = ry * tile.tileH;           // GL rows, measured from the bottom
       const th = Math.min(tile.tileH, height - y0);
@@ -683,25 +620,10 @@ export class SkullRenderer {
             this._scatter(fields, scratch, width, height, x0, y0, tw, th, slot);
           }
         }
-        // Calibrate off the first tile: if the GPU is far quicker or slower than
-        // assumed, resize the tile for the rest of the plate rather than
-        // discovering it via a driver reset.
-        if (!calibrated) {
-          calibrated = true;
-          const ms = performance.now() - tileStart;
-          const px = tw * th * passes;
-          const scaled = Math.round((px * TARGET_TILE_MS) / Math.max(ms, 0.5));
-          // Grow at most 2x at a time. A single jump straight to the ceiling is
-          // how a working small tile gets replaced by a size the driver refuses.
-          const next = Math.max(4096, Math.min(MAX_TILE_PIXELS, scaled, this.tileBudget * 2));
-          const mayGrow = !this._noGrow && next > this.tileBudget;
-          if ((next < this.tileBudget * 0.6 || (mayGrow && next > this.tileBudget * 1.8))
-              && this._calibrations < 2) {
-            this._calibrations++;
-            this.tileBudget = next;
-            return this.render({ width, height, params, bandRows, onProgress });
-          }
-        }
+        // Tile timing feeds the *next* render, never this one. Retuning mid-render
+        // used to restart it, which meant reallocating -- the one operation this
+        // design exists to avoid.
+        slowestTile = Math.max(slowestTile, performance.now() - tileStart);
         done++;
         if (onProgress) onProgress(done / total);
         // Yield so the page stays responsive and the driver can breathe -- but
@@ -719,8 +641,18 @@ export class SkullRenderer {
     gl.bindVertexArray(null);
     if (gl.isContextLost()) {
       this.contextLost = true;
-      this.tileBudget = Math.max(4096, Math.floor(this.tileBudget / 3));
+      // Smaller draws next time; no reallocation is involved either way.
+      this.tilePixels = Math.max(4096, Math.floor(this.tilePixels / 3));
       throw contextLostError();
+    }
+
+    // Aim the next render at TARGET_TILE_MS per draw, clamped to what is
+    // allocated. Pure bookkeeping -- it changes only how the buffer is addressed.
+    if (slowestTile > 0) {
+      const px = tile.tileW * tile.tileH * passes;
+      const scaled = Math.round((px * TARGET_TILE_MS) / slowestTile);
+      const cap = this.alloc.w * this.alloc.h;
+      this.tilePixels = Math.max(4096, Math.min(cap, MAX_TILE_PIXELS, scaled));
     }
     return fields;
   }
