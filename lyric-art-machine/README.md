@@ -230,6 +230,11 @@ inside a 12 mm margin — never distorted to fill the sheet. Before exporting,
 the interface reports what the file contains and, in plot mode, roughly how
 long it will take to draw.
 
+**All colours are written as hex.** Canvas is happy with CSS Color Level 4's
+space-separated `hsl(H S% L%)`, but Inkscape's parser is not — it fails
+silently, and every path becomes invisible while still occupying its bounding
+box. Hex is the one notation everything understands.
+
 Note that a Blueprint plot inverts: bright lines on a dark ground become dark
 lines on white paper, because the paper is the paper.
 

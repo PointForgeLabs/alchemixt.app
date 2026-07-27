@@ -18,6 +18,7 @@
 
 import { hatchPolygon, simplify, type Mark, type Point } from './geometry';
 import { colorFor } from './painter';
+import { hslToHex } from './color';
 import type { Glow, Scene } from './geometry';
 import type { Palette } from './color';
 
@@ -195,10 +196,13 @@ function polylineLength(points: Point[]): number {
 
 interface EmittedPath {
   points: Point[];
+  /** Always hex — see hslToHex for why. */
   color: string;
   opacity: number;
   width: number;
   pen: number;
+  /** Solid region rather than a line. Artwork mode only. */
+  filled: boolean;
   /** The source mark's alpha, kept so budget culling can drop the faintest. */
   sourceAlpha: number;
   length: number;
@@ -242,24 +246,34 @@ export function toPlotterSvg(
   let totalLengthPx = 0;
   const pensSeen = new Set<number>();
 
-  const add = (points: Point[], m: Mark): void => {
+  const add = (points: Point[], m: Mark, filled = false): void => {
     const length = polylineLength(points);
-    if (points.length < 2 || length < minLengthPx) {
+    // A filled region is legitimately allowed to have a short perimeter; only
+    // lines are dropped for being stubs.
+    if (points.length < 2 || (!filled && length < minLengthPx)) {
       dropped += 1;
       return;
     }
     const pen = options.separatePens ? m.layer : 0;
     pensSeen.add(pen);
+
+    const source = artwork
+      ? colorFor(palette, m)
+      : pen === 0
+        ? (palette.marks[Math.floor(palette.marks.length / 2)] ?? '#222222')
+        : palette.accent;
+    const { hex, alpha } = hslToHex(source);
+
     paths.push({
       points,
-      color: artwork ? colorFor(palette, m) : pen === 0
-        ? (palette.marks[Math.floor(palette.marks.length / 2)] ?? '#222222')
-        : palette.accent,
-      opacity: artwork ? Math.max(0.02, Math.min(1, m.alpha)) : 1,
+      color: hex,
+      // The palette's own alpha multiplies the mark's own.
+      opacity: artwork ? Math.max(0.02, Math.min(1, m.alpha * alpha)) : 1,
       width: artwork
         ? Math.max(0.08, m.weight * 0.28 * (options.penWidth / 0.3))
         : options.penWidth,
       pen,
+      filled,
       sourceAlpha: m.alpha,
       length,
     });
@@ -273,7 +287,14 @@ export function toPlotterSvg(
       continue;
     }
 
-    // In artwork mode a filled region stays filled; only the pen needs hatching.
+    // Artwork keeps the region solid; the pen gets hatching instead.
+    if (m.fill && m.closed && m.points.length >= 3 && artwork) {
+      for (const piece of clipPolyline([...m.points, m.points[0] as Point], sourceWidth, sourceHeight)) {
+        add(simplify(piece, options.tolerance), m, true);
+      }
+      continue;
+    }
+
     if (m.fill && m.closed && m.points.length >= 3 && !artwork) {
       const spacing = Math.max(minLengthPx * 3, (options.penWidth * 2.2) / scale);
       for (const line of hatchPolygon(m.points, Math.PI / 4, spacing)) {
@@ -335,7 +356,7 @@ export function toPlotterSvg(
     body.push(
       `  <g inkscape:groupmode="layer" inkscape:label="Ground" id="ground">`,
       `    <rect x="0" y="0" width="${format(pageWidth)}" height="${format(pageHeight)}" ` +
-        `fill="${escapeXml(palette.ground)}"/>`,
+        `fill="${hslToHex(palette.ground).hex}"/>`,
       '  </g>',
     );
 
@@ -354,10 +375,11 @@ export function toPlotterSvg(
           : (palette.marks[
               Math.min(palette.marks.length - 1, Math.floor(glow.tone * palette.marks.length))
             ] as string);
+        const glowHex = hslToHex(color).hex;
         defs.push(
           `    <radialGradient id="${id}">` +
-            `<stop offset="0" stop-color="${escapeXml(color)}" stop-opacity="${format(Math.min(1, glow.strength))}"/>` +
-            `<stop offset="1" stop-color="${escapeXml(color)}" stop-opacity="0"/>` +
+            `<stop offset="0" stop-color="${glowHex}" stop-opacity="${format(Math.min(1, glow.strength))}"/>` +
+            `<stop offset="1" stop-color="${glowHex}" stop-opacity="0"/>` +
             '</radialGradient>',
         );
         body.push(
@@ -378,17 +400,26 @@ export function toPlotterSvg(
 
     body.push(
       `  <g inkscape:groupmode="layer" inkscape:label="Pen ${pen + 1}" id="pen-${pen + 1}" ` +
-        'fill="none" stroke-linecap="round" stroke-linejoin="round">',
+        'stroke-linecap="round" stroke-linejoin="round">',
     );
     for (const path of inLayer) {
       const d = path.points
         .map(([x, y], index) => `${index === 0 ? 'M' : 'L'}${px(x)} ${py(y)}`)
-        .join(' ');
-      const opacity = path.opacity < 0.999 ? ` stroke-opacity="${format(path.opacity)}"` : '';
-      body.push(
-        `    <path d="${d}" stroke="${escapeXml(path.color)}" ` +
-          `stroke-width="${format(path.width)}"${opacity}/>`,
-      );
+        .join(' ') + (path.filled ? ' Z' : '');
+      const alpha = format(path.opacity);
+      if (path.filled) {
+        body.push(
+          `    <path d="${d}" fill="${path.color}" fill-opacity="${alpha}" ` +
+            `stroke="${path.color}" stroke-width="${format(path.width * 0.6)}" ` +
+            `stroke-opacity="${alpha}"/>`,
+        );
+      } else {
+        const op = path.opacity < 0.999 ? ` stroke-opacity="${alpha}"` : '';
+        body.push(
+          `    <path d="${d}" fill="none" stroke="${path.color}" ` +
+            `stroke-width="${format(path.width)}"${op}/>`,
+        );
+      }
     }
     body.push('  </g>');
   }
