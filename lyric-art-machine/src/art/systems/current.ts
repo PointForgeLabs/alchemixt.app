@@ -8,7 +8,7 @@
 import type { RenderEnv, SystemDraw } from '../renderer';
 
 export const current: SystemDraw = function* (env: RenderEnv) {
-  const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+  const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
 
   const particleCount = Math.round(600 + genome.density * 2600);
   const stepsPerParticle = Math.round(60 + (1 - genome.turbulence) * 260);
@@ -33,13 +33,17 @@ export const current: SystemDraw = function* (env: RenderEnv) {
       ? palette.accent
       : (palette.marks[rng.int(0, palette.marks.length - 1)] as string);
 
+    // The track runs left to right across the canvas, so quiet passages leave
+    // thin, faint current and loud ones churn.
+    const loudness = arcAt(x / width);
+
     ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.05 + rng.next() * (0.12 + genome.weight * 0.2);
+    ctx.globalAlpha = (0.05 + rng.next() * (0.12 + genome.weight * 0.2)) * loudness;
     ctx.lineWidth = lineWidth * rng.range(0.5, 1.9);
     ctx.beginPath();
     ctx.moveTo(x, y);
 
-    const life = Math.round(stepsPerParticle * rng.range(0.35, 1.2));
+    const life = Math.round(stepsPerParticle * rng.range(0.35, 1.2) * loudness);
     for (let s = 0; s < life; s += 1) {
       const n = noise(x * scale, y * scale);
       const fieldAngle = n * Math.PI * 4;

@@ -63,6 +63,25 @@
             <button type="button" class="secondary" id="read-pasted">Read these words</button>
           </details>
 
+          <!-- Optional: let the machine hear the song, not just read it -->
+          <section class="hearing" id="hearing">
+            <span class="field-label">Sound &mdash; optional</span>
+            <p class="hearing-note">
+              A link gives the machine words only. Give it the audio and it also hears tempo, key,
+              dynamics, and texture &mdash; which changes the picture considerably.
+            </p>
+            <div class="drop" id="drop-zone">
+              <input type="file" id="audio-input" accept="audio/*" hidden />
+              <div class="drop-actions">
+                <button type="button" class="secondary" id="choose-audio">Choose audio file</button>
+                <button type="button" class="secondary" id="listen-tab">Listen to a tab</button>
+              </div>
+              <p class="drop-hint" id="drop-hint">or drop an audio file here</p>
+            </div>
+            <p class="status" id="audio-status" role="status" aria-live="polite"></p>
+            <div class="progress inline" id="audio-progress" hidden><span id="audio-progress-bar"></span></div>
+          </section>
+
           <!-- The machine's written interpretation -->
           <article class="reading" id="reading" hidden>
             <div class="now-reading" id="now-reading"></div>
@@ -74,6 +93,12 @@
               <strong class="system-name" id="system-name"></strong>
               <p class="system-description" id="system-description"></p>
             </div>
+
+            <section class="reading-block" id="heard-block" hidden>
+              <h3>What it heard</h3>
+              <dl class="metrics" id="audio-metrics"></dl>
+              <ul class="notes" id="heard-notes"></ul>
+            </section>
 
             <section class="reading-block">
               <h3>Why it looks like this</h3>

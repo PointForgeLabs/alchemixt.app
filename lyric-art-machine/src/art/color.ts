@@ -51,11 +51,17 @@ export interface PaletteInput {
   arousal: number;
   /** Force a dark ground regardless of valence. */
   forceNocturne?: boolean;
+  /** 0..1 spectral brightness from the audio. 0.5 is neutral / unheard. */
+  brightness?: number;
   rng: Rng;
 }
 
 export function buildPalette(input: PaletteInput): Palette {
   const { baseHue, harmony, valence, arousal, rng } = input;
+  // A bass-heavy mix should not produce an airy pastel picture, and a bright
+  // one should not produce a murky ink drawing.
+  const brightness = input.brightness ?? 0.5;
+  const lift = (brightness - 0.5) * 22;
 
   // Bleak songs get dark grounds; radiant ones get paper. The threshold sits
   // slightly below neutral so ambiguous songs lean dark, which simply looks better.
@@ -79,8 +85,8 @@ export function buildPalette(input: PaletteInput): Palette {
     const drift = rng.range(-9, 9);
     const step = i / Math.max(1, offsets.length - 1);
     const lightness = nocturne
-      ? 42 + step * 30 + arousal * 12
-      : 46 - step * 26 - arousal * 8;
+      ? 42 + step * 30 + arousal * 12 + lift
+      : 46 - step * 26 - arousal * 8 - lift * 0.6;
     return hsl(
       baseHue + offset + drift,
       saturation * (0.72 + step * 0.35),

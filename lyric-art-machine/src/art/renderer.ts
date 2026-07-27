@@ -28,6 +28,27 @@ export interface RenderEnv {
   genome: ArtGenome;
   rng: Rng;
   noise: (x: number, y: number) => number;
+  /**
+   * Samples the song's loudness envelope at position `t` (0..1) through the
+   * track, returning a 0..1 multiplier. Always returns 1 when the machine
+   * never heard the audio, so systems can use it unconditionally.
+   */
+  arcAt: (t: number) => number;
+}
+
+/** Builds the envelope sampler, with linear interpolation between arc points. */
+function makeArcSampler(arc: number[]): (t: number) => number {
+  if (arc.length < 2) return () => 1;
+  return (t: number): number => {
+    const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+    const position = clamped * (arc.length - 1);
+    const index = Math.floor(position);
+    const next = Math.min(arc.length - 1, index + 1);
+    const frac = position - index;
+    const value = (arc[index] as number) * (1 - frac) + (arc[next] as number) * frac;
+    // Compressed toward 1 so a quiet intro thins the canvas without emptying it.
+    return 0.45 + value * 0.55;
+  };
 }
 
 export type SystemDraw = (env: RenderEnv) => Generator<number, void, unknown>;
@@ -117,6 +138,7 @@ export function render(
     valence: genome.valence,
     arousal: genome.arousal,
     forceNocturne: genome.forceNocturne,
+    brightness: genome.brightness,
     rng,
   });
 
@@ -129,6 +151,7 @@ export function render(
     genome,
     rng,
     noise: makeNoise2D(genome.seed ^ 0x5bf03635),
+    arcAt: makeArcSampler(genome.arc),
   };
 
   layGround(env);

@@ -66,8 +66,11 @@ export const radiance: SystemDraw = function* (env: RenderEnv) {
     if (i % 20 === 0) yield 0.05 + (i / rayCount) * 0.55;
   }
 
-  // Orbits — concentric arcs, broken where the song is unresolved.
-  const orbitCount = Math.round(4 + genome.density * 22);
+  // Orbits — concentric arcs, broken where the song is unresolved. With audio,
+  // each detected section gets its own ring, so structure becomes visible.
+  // Additive, not multiplicative: scaling by section count would put hundreds
+  // of rings on a track the analyzer read as highly sectional.
+  const orbitCount = Math.round(4 + genome.density * 22 + (genome.heard ? genome.sections * 2 : 0));
   for (let i = 0; i < orbitCount; i += 1) {
     const r = coreRadius * 1.5 + (maxRadius - coreRadius) * ((i + rng.range(0, 0.6)) / orbitCount);
     const start = rng.range(0, Math.PI * 2);

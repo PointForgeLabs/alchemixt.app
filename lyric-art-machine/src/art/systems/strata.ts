@@ -8,8 +8,10 @@
 import type { RenderEnv, SystemDraw } from '../renderer';
 
 export const strata: SystemDraw = function* (env: RenderEnv) {
-  const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+  const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
 
+  // With audio, each band is a moment in the track: the stack reads bottom-up
+  // as the song plays, so loud passages become thick, emphatic layers.
   const bandCount = Math.round(14 + genome.density * 70);
   const roughness = unit * (0.004 + genome.turbulence * 0.05);
   const scale = 0.0016 + genome.turbulence * 0.004;
@@ -20,7 +22,9 @@ export const strata: SystemDraw = function* (env: RenderEnv) {
   let index = 0;
 
   while (y > -height * 0.1 && index < bandCount * 2) {
-    const thickness = (height / bandCount) * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25);
+    const loudness = arcAt(1 - y / height);
+    const thickness =
+      (height / bandCount) * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25) * loudness;
     const top = y - thickness;
 
     const color = index % 7 === 0
@@ -28,7 +32,7 @@ export const strata: SystemDraw = function* (env: RenderEnv) {
       : (palette.marks[index % palette.marks.length] as string);
 
     ctx.fillStyle = color;
-    ctx.globalAlpha = 0.2 + rng.next() * (0.35 + genome.weight * 0.4);
+    ctx.globalAlpha = (0.2 + rng.next() * (0.35 + genome.weight * 0.4)) * loudness;
 
     // The band's upper edge is a noise-displaced line, not a straight one.
     ctx.beginPath();

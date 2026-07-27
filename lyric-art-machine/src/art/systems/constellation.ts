@@ -16,7 +16,7 @@ interface Star {
 }
 
 export const constellation: SystemDraw = function* (env: RenderEnv) {
-  const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+  const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
 
   // Atmosphere first: soft clouds so the dark isn't uniform.
   const clouds = Math.round(6 + genome.density * 20);
@@ -46,7 +46,8 @@ export const constellation: SystemDraw = function* (env: RenderEnv) {
     attempts += 1;
     const x = rng.range(0, width);
     const y = rng.range(0, height);
-    const clusterBias = noise(x * 0.0018, y * 0.0018);
+    // Loud passages of the track become dense fields of stars.
+    const clusterBias = noise(x * 0.0018, y * 0.0018) * arcAt(x / width);
     if (rng.next() > clusterBias * (0.5 + genome.density)) continue;
     stars.push({
       x,

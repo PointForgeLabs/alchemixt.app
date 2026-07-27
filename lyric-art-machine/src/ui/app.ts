@@ -11,6 +11,10 @@ import { analyze, type SongAnalysis } from '../analysis/analyze';
 import { explain, interpret, type ArtGenome } from '../analysis/interpret';
 import { acquire, type LyricsResult, type TrackGuess, type VideoMeta } from '../lyrics';
 import { render, type RenderHandle } from '../art/renderer';
+import { decodeBlob, decodeFile } from '../audio/decode';
+import { extractFeatures } from '../audio/features';
+import { captureTabAudio, tabCaptureSupported, type CaptureSession } from '../audio/live';
+import type { AudioFeatures } from '../audio/types';
 
 type FormatKey = 'portrait' | 'square' | 'landscape' | 'poster';
 
@@ -36,6 +40,36 @@ interface Subject {
   variation: number;
 }
 
+/**
+ * Drives a generator-based analysis across animation frames, so a long track
+ * doesn't lock the page while it's being listened to.
+ */
+function runProgressively<T>(
+  iterator: Generator<{ progress: number; stage: string }, T, unknown>,
+  onProgress: (progress: number, stage: string) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const step = (): void => {
+      try {
+        const deadline = performance.now() + 14;
+        let result = iterator.next();
+        while (!result.done && performance.now() < deadline) {
+          result = iterator.next();
+        }
+        if (result.done) {
+          resolve(result.value);
+          return;
+        }
+        onProgress(result.value.progress, result.value.stage);
+        requestAnimationFrame(step);
+      } catch (error) {
+        reject(error instanceof Error ? error : new Error('Audio analysis failed.'));
+      }
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 export function mountApp(): void {
   const form = must<HTMLFormElement>('intake-form');
   const urlInput = must<HTMLInputElement>('url-input');
@@ -44,6 +78,17 @@ export function mountApp(): void {
   const fallback = must<HTMLDetailsElement>('fallback');
   const lyricsInput = must<HTMLTextAreaElement>('lyrics-input');
   const readPasted = must<HTMLButtonElement>('read-pasted');
+
+  const dropZone = must<HTMLElement>('drop-zone');
+  const audioInput = must<HTMLInputElement>('audio-input');
+  const chooseAudio = must<HTMLButtonElement>('choose-audio');
+  const listenTab = must<HTMLButtonElement>('listen-tab');
+  const audioStatus = must<HTMLParagraphElement>('audio-status');
+  const audioProgress = must<HTMLElement>('audio-progress');
+  const audioProgressBar = must<HTMLElement>('audio-progress-bar');
+  const heardBlock = must<HTMLElement>('heard-block');
+  const audioMetrics = must<HTMLElement>('audio-metrics');
+  const heardNotes = must<HTMLUListElement>('heard-notes');
 
   const readingEl = must<HTMLElement>('reading');
   const nowReading = must<HTMLElement>('now-reading');
@@ -67,6 +112,9 @@ export function mountApp(): void {
   let subject: Subject | null = null;
   let activeRender: RenderHandle | null = null;
   let inFlight: AbortController | null = null;
+  /** Persists across songs: audio, once heard, keeps informing the picture. */
+  let audio: AudioFeatures | null = null;
+  let capture: CaptureSession | null = null;
 
   // ---------------------------------------------------------------- status
 
@@ -160,8 +208,52 @@ export function mountApp(): void {
     }
   }
 
+  function renderAudioPanel(features: AudioFeatures | null, reading: ReturnType<typeof explain>): void {
+    if (!features) {
+      heardBlock.hidden = true;
+      return;
+    }
+
+    const entries: [string, string, string?][] = [
+      ['Tempo', features.tempo > 0 ? String(Math.round(features.tempo)) : '—', features.tempo > 0 ? 'bpm' : undefined],
+      ['Key', features.keyConfidence > 0.28 ? features.keyName : 'unsettled'],
+      ['Loudness', `${Math.round(features.energy * 100)}%`],
+      ['Dynamics', `${Math.round(features.dynamicRange * 100)}%`],
+      ['Brightness', `${Math.round(features.brightness * 100)}%`],
+      ['Roughness', `${Math.round(features.roughness * 100)}%`],
+      ['Pulse', `${Math.round(features.pulseClarity * 100)}%`],
+      ['Sections', String(features.sections)],
+    ];
+
+    audioMetrics.replaceChildren();
+    for (const [label, value, suffix] of entries) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'metric';
+      const dt = document.createElement('dt');
+      dt.textContent = label;
+      const dd = document.createElement('dd');
+      dd.textContent = value;
+      if (suffix) {
+        const note = document.createElement('span');
+        note.textContent = suffix;
+        dd.append(note);
+      }
+      wrapper.append(dt, dd);
+      audioMetrics.append(wrapper);
+    }
+
+    heardNotes.replaceChildren();
+    for (const note of reading.heardNotes) {
+      const li = document.createElement('li');
+      li.textContent = note;
+      heardNotes.append(li);
+    }
+
+    heardBlock.hidden = false;
+  }
+
   function renderReading(analysis: SongAnalysis, genome: ArtGenome, current: Subject): void {
-    const reading = explain(analysis, genome);
+    const reading = explain(analysis, genome, audio);
 
     nowReading.replaceChildren();
     const label = document.createElement('strong');
@@ -172,6 +264,14 @@ export function mountApp(): void {
     }
     nowReading.append(document.createElement('br'));
     nowReading.append(document.createTextNode(current.sourceLabel));
+    if (audio) {
+      nowReading.append(document.createElement('br'));
+      nowReading.append(
+        document.createTextNode(
+          `Heard ${Math.round(audio.duration)}s of audio via ${audio.source === 'tab' ? 'tab capture' : 'file'}`,
+        ),
+      );
+    }
 
     verdictEl.textContent = reading.verdict;
     systemName.textContent = reading.systemLabel;
@@ -184,6 +284,7 @@ export function mountApp(): void {
       notesEl.append(li);
     }
 
+    renderAudioPanel(audio, reading);
     renderThemes(analysis);
     renderMetrics(analysis, genome);
 
@@ -207,7 +308,7 @@ export function mountApp(): void {
 
     activeRender?.cancel();
 
-    const genome = interpret(subject.analysis, subject.variation);
+    const genome = interpret(subject.analysis, audio, subject.variation);
     const format = FORMATS[(formatSelect.value as FormatKey)] ?? FORMATS.portrait;
 
     renderReading(subject.analysis, genome, subject);
@@ -225,7 +326,8 @@ export function mountApp(): void {
     plate.append(plateTitle);
     plate.append(
       document.createTextNode(
-        ` · ${genome.system} · ${format.label} · seed ${genome.seed.toString(16)}` +
+        ` · ${genome.system} · ${format.label} · ${genome.heard ? 'heard + read' : 'read only'}` +
+          ` · seed ${genome.seed.toString(16)}` +
           (subject.variation > 0 ? ` · var ${subject.variation}` : ''),
       ),
     );
@@ -366,6 +468,133 @@ export function mountApp(): void {
 
   formatSelect.addEventListener('change', () => {
     if (subject) paint();
+  });
+
+  // ---------------------------------------------------------------- audio
+
+  function setAudioStatus(message: string, tone: 'idle' | 'working' | 'error' = 'idle'): void {
+    audioStatus.textContent = message;
+    audioStatus.classList.toggle('working', tone === 'working');
+    audioStatus.classList.toggle('error', tone === 'error');
+  }
+
+  function setAudioBusy(busy: boolean): void {
+    chooseAudio.disabled = busy;
+    if (busy) listenTab.disabled = true;
+    else listenTab.disabled = !tabCaptureSupported();
+    audioProgress.hidden = !busy;
+    if (busy) audioProgressBar.style.width = '0%';
+  }
+
+  /** Shared tail of both audio paths: analyze, store, and repaint if we can. */
+  async function ingestAudio(buffer: AudioBuffer, source: 'file' | 'tab'): Promise<void> {
+    const features = await runProgressively(extractFeatures(buffer, source), (progress, stage) => {
+      audioProgressBar.style.width = `${Math.round(progress * 100)}%`;
+      setAudioStatus(`${stage}…`, 'working');
+    });
+
+    audio = features;
+    setAudioStatus(
+      `Heard ${Math.round(features.duration)}s${features.tempo > 0 ? ` · ${Math.round(features.tempo)} BPM` : ''}` +
+        `${features.keyConfidence > 0.28 ? ` · ${features.keyName}` : ''}. ` +
+        (subject ? 'Repainting with sound.' : 'Now add a song link or lyrics.'),
+    );
+
+    // Audio alone can't make a picture — the lyrics choose the visual system.
+    if (subject) paint();
+  }
+
+  function handleAudioError(error: unknown): void {
+    const message = error instanceof Error ? error.message : 'Could not read that audio.';
+    setAudioStatus(message, 'error');
+  }
+
+  async function ingestFile(file: File): Promise<void> {
+    setAudioBusy(true);
+    setAudioStatus('Decoding…', 'working');
+    try {
+      const buffer = await decodeFile(file);
+      await ingestAudio(buffer, 'file');
+    } catch (error) {
+      handleAudioError(error);
+    } finally {
+      setAudioBusy(false);
+    }
+  }
+
+  chooseAudio.addEventListener('click', () => audioInput.click());
+
+  audioInput.addEventListener('change', () => {
+    const file = audioInput.files?.[0];
+    if (file) void ingestFile(file);
+    // Reset so choosing the same file twice still fires a change event.
+    audioInput.value = '';
+  });
+
+  for (const eventName of ['dragenter', 'dragover'] as const) {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.add('is-dragging');
+    });
+  }
+  for (const eventName of ['dragleave', 'dragend'] as const) {
+    dropZone.addEventListener(eventName, () => dropZone.classList.remove('is-dragging'));
+  }
+  dropZone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    dropZone.classList.remove('is-dragging');
+    const file = event.dataTransfer?.files?.[0];
+    if (file) void ingestFile(file);
+  });
+
+  // The browser blocks navigation-by-drop only inside the zone, so stop the
+  // page from replacing itself when a file lands anywhere else.
+  window.addEventListener('dragover', (event) => event.preventDefault());
+  window.addEventListener('drop', (event) => event.preventDefault());
+
+  listenTab.disabled = !tabCaptureSupported();
+  if (!tabCaptureSupported()) {
+    listenTab.title = 'Tab audio capture needs Chrome or Edge.';
+  }
+
+  listenTab.addEventListener('click', () => {
+    // Second click stops an in-progress capture.
+    if (capture) {
+      capture.stop();
+      capture = null;
+      listenTab.textContent = 'Listen to a tab';
+      setAudioStatus('Finishing the recording…', 'working');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const session = await captureTabAudio();
+        capture = session;
+        listenTab.textContent = 'Stop listening';
+        setAudioStatus('Listening — play the song, then press stop.', 'working');
+
+        session.onEnded(() => {
+          capture = null;
+          listenTab.textContent = 'Listen to a tab';
+        });
+
+        const blob = await session.result;
+        capture = null;
+        listenTab.textContent = 'Listen to a tab';
+
+        setAudioBusy(true);
+        setAudioStatus('Decoding what it heard…', 'working');
+        const buffer = await decodeBlob(blob);
+        await ingestAudio(buffer, 'tab');
+      } catch (error) {
+        capture = null;
+        listenTab.textContent = 'Listen to a tab';
+        handleAudioError(error);
+      } finally {
+        setAudioBusy(false);
+      }
+    })();
   });
 
   download.addEventListener('click', () => {

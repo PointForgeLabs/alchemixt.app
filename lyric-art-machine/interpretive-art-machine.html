@@ -270,6 +270,67 @@ button:disabled {
   margin: 12px 0 10px;
 }
 
+/* ---------- hearing (audio intake) ---------- */
+
+.hearing {
+  margin-top: 20px;
+}
+
+.hearing-note {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  line-height: 1.55;
+  margin: 0 0 11px;
+}
+
+.drop {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 16px 14px;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.drop.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.drop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.drop-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.progress.inline {
+  position: static;
+  margin-top: 10px;
+  left: auto;
+  right: auto;
+  bottom: auto;
+}
+
+.heard-chip {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid rgba(216, 135, 74, 0.4);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-bottom: 10px;
+}
+
 /* ---------- reading ---------- */
 
 .reading {
@@ -698,6 +759,25 @@ button:disabled {
             <button type="button" class="secondary" id="read-pasted">Read these words</button>
           </details>
 
+          <!-- Optional: let the machine hear the song, not just read it -->
+          <section class="hearing" id="hearing">
+            <span class="field-label">Sound &mdash; optional</span>
+            <p class="hearing-note">
+              A link gives the machine words only. Give it the audio and it also hears tempo, key,
+              dynamics, and texture &mdash; which changes the picture considerably.
+            </p>
+            <div class="drop" id="drop-zone">
+              <input type="file" id="audio-input" accept="audio/*" hidden />
+              <div class="drop-actions">
+                <button type="button" class="secondary" id="choose-audio">Choose audio file</button>
+                <button type="button" class="secondary" id="listen-tab">Listen to a tab</button>
+              </div>
+              <p class="drop-hint" id="drop-hint">or drop an audio file here</p>
+            </div>
+            <p class="status" id="audio-status" role="status" aria-live="polite"></p>
+            <div class="progress inline" id="audio-progress" hidden><span id="audio-progress-bar"></span></div>
+          </section>
+
           <!-- The machine's written interpretation -->
           <article class="reading" id="reading" hidden>
             <div class="now-reading" id="now-reading"></div>
@@ -709,6 +789,12 @@ button:disabled {
               <strong class="system-name" id="system-name"></strong>
               <p class="system-description" id="system-description"></p>
             </div>
+
+            <section class="reading-block" id="heard-block" hidden>
+              <h3>What it heard</h3>
+              <dl class="metrics" id="audio-metrics"></dl>
+              <ul class="notes" id="heard-notes"></ul>
+            </section>
 
             <section class="reading-block">
               <h3>Why it looks like this</h3>
@@ -771,6 +857,10 @@ button:disabled {
 
     <script>
 (() => {
+  var __defProp = Object.defineProperty;
+  var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+  var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+
   // src/analysis/tokenize.ts
   var SECTION_RE = /^\s*[\[({]\s*([^\])}]{1,40}?)\s*[\])}]\s*$/;
   var NOISE_RE = /^\s*(\d+\s*(embed|contributors?)|you might also like|see .+ live|get tickets.*)\s*$/i;
@@ -2202,8 +2292,13 @@ button:disabled {
     water: 202,
     fire: 24
   };
+  var CALM_SYSTEMS = /* @__PURE__ */ new Set(["strata", "constellation", "growth", "radiance"]);
+  var AGITATED_SYSTEMS = /* @__PURE__ */ new Set(["fracture", "lattice", "current"]);
   function clamp2(v, lo, hi) {
     return v < lo ? lo : v > hi ? hi : v;
+  }
+  function mix(a, b, t) {
+    return a + (b - a) * t;
   }
   function circularMean(hues) {
     if (hues.length === 0) return 0;
@@ -2216,44 +2311,99 @@ button:disabled {
     }
     return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
   }
-  function pickHarmony(a, dominant) {
+  function hueFromKey(keyIndex, mode) {
+    const fifthsPosition = keyIndex * 7 % 12;
+    return (fifthsPosition * 30 + (mode === "minor" ? 18 : 0)) % 360;
+  }
+  function aggression(audio) {
+    const fast = clamp2((audio.tempo - 100) / 70, 0, 1);
+    return clamp2(audio.energy * 0.4 + audio.roughness * 0.3 + fast * 0.2 + audio.onsetDensity * 0.25, 0, 1);
+  }
+  function stillness(audio) {
+    const slow = clamp2((100 - audio.tempo) / 55, 0, 1);
+    return clamp2((1 - audio.energy) * 0.4 + slow * 0.3 + (1 - audio.onsetDensity) * 0.3, 0, 1);
+  }
+  function pickHarmony(a, dominant, audio) {
     const contested = a.themes.length > 1 && (a.themes[1]?.strength ?? 0) > 0.72;
     if (contested) return a.arousal > 0.6 ? "complementary" : "split";
+    if (audio && audio.roughness > 0.62 && audio.energy > 0.55) return "complementary";
+    if (audio && audio.mode === "minor" && audio.keyConfidence > 0.35 && audio.brightness < 0.4) {
+      return "monochrome";
+    }
     if (dominant === "defiance" || dominant === "fire") return "complementary";
     if (dominant === "night" || dominant === "loss") return "monochrome";
     if (a.diversity > 0.72) return "triad";
     return "analogous";
   }
-  function interpret(analysis, variation = 0) {
+  function audioSeed(audio) {
+    const parts = [
+      Math.round(audio.tempo * 10),
+      Math.round(audio.energy * 1e3),
+      Math.round(audio.brightness * 1e3),
+      Math.round(audio.roughness * 1e3),
+      audio.keyIndex,
+      audio.mode === "minor" ? 1 : 0,
+      audio.sections
+    ];
+    let h = 2166136261;
+    for (const part of parts) {
+      h ^= part;
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function interpret(analysis, audio, variation = 0) {
     const dominant = analysis.themes[0];
     const dominantKey = dominant && dominant.strength > 0 ? dominant.key : "memory";
     const second = analysis.themes[1];
-    const baseHue = analysis.namedHues.length > 0 ? circularMean(analysis.namedHues.slice(0, 3)) : HUE_BY_THEME[dominantKey];
     const secondStrength = second?.strength ?? 0;
+    let system = SYSTEM_BY_THEME[dominantKey];
+    if (audio) {
+      if (aggression(audio) > 0.72 && CALM_SYSTEMS.has(system)) {
+        system = "fracture";
+      } else if (stillness(audio) > 0.72 && AGITATED_SYSTEMS.has(system)) {
+        system = dominantKey === "city" ? "strata" : "constellation";
+      }
+    }
+    const modeShift = audio ? (audio.mode === "major" ? 0.32 : -0.32) * audio.keyConfidence : 0;
+    const valence = audio ? clamp2(mix(analysis.valence, analysis.valence + modeShift + (audio.brightness - 0.5) * 0.3, 0.75), -1, 1) : analysis.valence;
+    const heardArousal = audio ? clamp2(audio.energy * 0.45 + clamp2((audio.tempo - 60) / 120, 0, 1) * 0.3 + audio.onsetDensity * 0.25, 0, 1) : 0;
+    const arousal = audio ? clamp2(mix(analysis.arousal, heardArousal, 0.7), 0, 1) : analysis.arousal;
+    const themeHue = HUE_BY_THEME[dominantKey];
+    let baseHue;
+    if (analysis.namedHues.length > 0) {
+      baseHue = circularMean(analysis.namedHues.slice(0, 3));
+    } else if (audio && audio.keyConfidence > 0.28) {
+      baseHue = circularMean([themeHue, themeHue, hueFromKey(audio.keyIndex, audio.mode)]);
+    } else {
+      baseHue = themeHue;
+    }
+    const seedBase = audio ? (analysis.fingerprint ^ audioSeed(audio)) >>> 0 : analysis.fingerprint;
     return {
-      system: SYSTEM_BY_THEME[dominantKey],
-      // Variation is folded into the seed so re-rolls are reproducible too.
-      seed: (analysis.fingerprint ^ Math.imul(variation + 1, 2654435769)) >>> 0,
+      system,
+      seed: (seedBase ^ Math.imul(variation + 1, 2654435769)) >>> 0,
       baseHue,
-      harmony: pickHarmony(analysis, dominantKey),
-      valence: analysis.valence,
-      arousal: analysis.arousal,
-      // A wordy song puts more on the canvas; a repetitive one puts less, but louder.
-      density: clamp2(0.24 + analysis.diversity * 0.5 + analysis.arousal * 0.28 - analysis.repetition * 0.2, 0.08, 1),
-      // Turbulence is disorder: loud, unresolved, and asking questions.
-      turbulence: clamp2(analysis.arousal * 0.62 + Math.max(0, -analysis.valence) * 0.3 + analysis.inquiry * 0.25, 0, 1),
-      // Songs that address someone or reach upward pull toward a center.
+      harmony: pickHarmony(analysis, dominantKey, audio),
+      valence,
+      arousal,
+      density: audio ? clamp2(0.2 + audio.onsetDensity * 0.45 + audio.flux * 0.2 + analysis.diversity * 0.25, 0.08, 1) : clamp2(0.24 + analysis.diversity * 0.5 + analysis.arousal * 0.28 - analysis.repetition * 0.2, 0.08, 1),
+      turbulence: audio ? clamp2(audio.roughness * 0.42 + audio.flux * 0.28 + (1 - audio.pulseClarity) * 0.2 + Math.max(0, -valence) * 0.2, 0, 1) : clamp2(analysis.arousal * 0.62 + Math.max(0, -analysis.valence) * 0.3 + analysis.inquiry * 0.25, 0, 1),
       gravity: clamp2(
-        (analysis.voice === "address" ? 0.55 : analysis.voice === "collective" ? 0.42 : 0.3) + secondStrength * 0.16 + (dominantKey === "transcendence" || dominantKey === "love" ? 0.24 : 0),
+        (analysis.voice === "address" ? 0.55 : analysis.voice === "collective" ? 0.42 : 0.3) + secondStrength * 0.16 + (dominantKey === "transcendence" || dominantKey === "love" ? 0.24 : 0) + (audio ? audio.keyConfidence * 0.2 - audio.stereoWidth * 0.12 : 0),
         0,
         1
       ),
-      // Repetition is emphasis, and emphasis is weight.
-      weight: clamp2(0.22 + analysis.repetition * 0.5 + analysis.arousal * 0.26, 0.08, 1),
-      // Rhyme and repeated lines are formal structure, and structure shows as symmetry.
-      symmetry: clamp2(analysis.rhyme * 0.5 + analysis.repetition * 0.42, 0, 1),
-      grain: clamp2(0.26 + Math.max(0, -analysis.valence) * 0.42 + analysis.repetition * 0.18, 0, 1),
-      forceNocturne: dominantKey === "night" || dominantKey === "loss"
+      // Loud and heavily compressed masters are the visual equivalent of heavy marks.
+      weight: audio ? clamp2(0.16 + audio.energy * 0.5 + (1 - audio.dynamicRange) * 0.24 + analysis.repetition * 0.2, 0.08, 1) : clamp2(0.22 + analysis.repetition * 0.5 + analysis.arousal * 0.26, 0.08, 1),
+      // A metronomic track is a symmetrical one.
+      symmetry: audio ? clamp2(analysis.rhyme * 0.3 + analysis.repetition * 0.28 + audio.pulseClarity * 0.42, 0, 1) : clamp2(analysis.rhyme * 0.5 + analysis.repetition * 0.42, 0, 1),
+      grain: audio ? clamp2(0.2 + audio.roughness * 0.45 + Math.max(0, -valence) * 0.25, 0, 1) : clamp2(0.26 + Math.max(0, -analysis.valence) * 0.42 + analysis.repetition * 0.18, 0, 1),
+      forceNocturne: audio ? audio.brightness < 0.32 && valence < 0.15 || dominantKey === "night" || dominantKey === "loss" : dominantKey === "night" || dominantKey === "loss",
+      heard: audio !== null,
+      pulse: audio && audio.tempo > 0 ? clamp2((audio.tempo - 60) / 130, 0, 1) : 0.5,
+      brightness: audio ? audio.brightness : 0.5,
+      sections: audio ? audio.sections : 1,
+      arc: audio ? audio.arc : []
     };
   }
   function describeValence(v) {
@@ -2276,11 +2426,19 @@ button:disabled {
     collective: 'It speaks as "we", so the marks gather into crowds rather than individuals.',
     observed: "It watches other people, so the composition holds its subject at a distance."
   };
-  function explain(analysis, genome) {
+  function describeTempo(bpm) {
+    if (bpm >= 160) return "headlong";
+    if (bpm >= 130) return "quick";
+    if (bpm >= 108) return "walking";
+    if (bpm >= 85) return "unhurried";
+    return "slow";
+  }
+  function explain(analysis, genome, audio) {
     const info = SYSTEM_INFO[genome.system];
     const dominant = analysis.themes[0];
     const second = analysis.themes[1];
     const notes = [];
+    const heardNotes = [];
     if (dominant && dominant.strength > 0) {
       notes.push(
         `Strongest field is ${dominant.label.toLowerCase()} \u2014 it ${dominant.gloss}. Triggered by words like ${dominant.hits.slice(0, 4).join(", ")}.`
@@ -2296,7 +2454,7 @@ button:disabled {
       );
     }
     notes.push(
-      `Emotional register reads ${describeValence(analysis.valence)} and ${describeArousal(analysis.arousal)}, which sets the palette ${genome.forceNocturne || analysis.valence < 0.08 ? "against a dark ground" : "on a pale ground"} at ${Math.round(genome.baseHue)}\xB0 hue.`
+      `Emotional register reads ${describeValence(genome.valence)} and ${describeArousal(genome.arousal)}, which sets the palette ${genome.forceNocturne || genome.valence < 0.08 ? "against a dark ground" : "on a pale ground"} at ${Math.round(genome.baseHue)}\xB0 hue.`
     );
     notes.push(VOICE_NOTE[analysis.voice]);
     if (analysis.repetition > 0.3) {
@@ -2310,7 +2468,7 @@ button:disabled {
     }
     if (analysis.namedHues.length > 0) {
       notes.push(
-        `The lyrics name colors directly, so the palette is anchored to what the song says rather than what it means.`
+        "The lyrics name colors directly, so the palette is anchored to what the song says rather than what it means."
       );
     }
     if (analysis.inquiry > 0.08) {
@@ -2318,12 +2476,50 @@ button:disabled {
         `${Math.round(analysis.inquiry * 100)}% of lines are questions, which adds unresolved motion to the field.`
       );
     }
-    const mood = describeValence(analysis.valence);
+    if (audio) {
+      if (audio.tempo > 0) {
+        const pace = describeTempo(audio.tempo);
+        heardNotes.push(
+          `${Math.round(audio.tempo)} BPM \u2014 ${/^[aeiou]/.test(pace) ? "an" : "a"} ${pace} pulse, ` + (audio.pulseClarity > 0.55 ? "and a strongly metrical one, so the composition is more regular and symmetrical." : "but a loose one, so the composition is left freer and less aligned.")
+        );
+      }
+      if (audio.keyConfidence > 0.28) {
+        heardNotes.push(
+          `Reads as ${audio.keyName}. ${audio.mode === "minor" ? "The minor mode pulls the register darker than the words alone suggest" : "The major mode lifts the register above what the words alone suggest"}, and the key sets the hue around the circle of fifths.`
+        );
+      } else {
+        heardNotes.push(
+          "No stable key emerged \u2014 either the harmony moves too much or the mix is too dense \u2014 so hue stays anchored to the lyrics."
+        );
+      }
+      heardNotes.push(
+        `Loudness sits at ${Math.round(audio.energy * 100)}% with ${audio.dynamicRange > 0.55 ? "wide dynamics, so marks vary in weight" : "narrow dynamics, so marks stay uniformly heavy"}.`
+      );
+      heardNotes.push(
+        `Timbre is ${audio.brightness > 0.6 ? "bright" : audio.brightness > 0.35 ? "mid-weighted" : "dark and bass-heavy"} and ${audio.roughness > 0.6 ? "noisy or distorted, which coarsens the grain" : "fairly clean, which keeps edges crisp"}.`
+      );
+      if (audio.sections > 1) {
+        heardNotes.push(
+          `${audio.sections} structural sections detected, and the loudness arc across the track shapes where the canvas gets busy.`
+        );
+      }
+      const systemFromLyrics = dominant && dominant.strength > 0 ? SYSTEM_BY_THEME[dominant.key] : "strata";
+      if (systemFromLyrics !== genome.system) {
+        heardNotes.push(
+          `The words alone would have produced ${SYSTEM_INFO[systemFromLyrics].label}, but the music is too ${aggression(audio) > 0.6 ? "violent" : "still"} for that, so the machine overruled the lyrics and used ${info.label}.`
+        );
+      }
+      if (audio.truncated) {
+        heardNotes.push("The track was long, so only the first ten minutes were analyzed.");
+      }
+    }
+    const mood = describeValence(genome.valence);
     const article = /^[aeiou]/.test(mood) ? "An" : "A";
-    const verdict = dominant && dominant.strength > 0 ? `${article} ${mood}, ${describeArousal(analysis.arousal)} song about ${dominant.label.toLowerCase()}, rendered as ${info.label}.` : `${article} ${mood}, ${describeArousal(analysis.arousal)} song, rendered as ${info.label}.`;
+    const verdict = dominant && dominant.strength > 0 ? `${article} ${mood}, ${describeArousal(genome.arousal)} song about ${dominant.label.toLowerCase()}, rendered as ${info.label}.` : `${article} ${mood}, ${describeArousal(genome.arousal)} song, rendered as ${info.label}.`;
     return {
       verdict,
       notes,
+      heardNotes,
       systemLabel: info.label,
       systemDescription: info.description
     };
@@ -2573,6 +2769,8 @@ button:disabled {
   };
   function buildPalette(input) {
     const { baseHue, harmony, valence, arousal, rng } = input;
+    const brightness = input.brightness ?? 0.5;
+    const lift = (brightness - 0.5) * 22;
     const nocturne = input.forceNocturne ?? valence < 0.08;
     const saturation = 28 + arousal * 46 + Math.abs(valence) * 12;
     const offsets = HARMONY_OFFSETS[harmony];
@@ -2585,7 +2783,7 @@ button:disabled {
     const marks = offsets.map((offset, i) => {
       const drift = rng.range(-9, 9);
       const step = i / Math.max(1, offsets.length - 1);
-      const lightness = nocturne ? 42 + step * 30 + arousal * 12 : 46 - step * 26 - arousal * 8;
+      const lightness = nocturne ? 42 + step * 30 + arousal * 12 + lift : 46 - step * 26 - arousal * 8 - lift * 0.6;
       return hsl(
         baseHue + offset + drift,
         saturation * (0.72 + step * 0.35),
@@ -2678,7 +2876,7 @@ button:disabled {
 
   // src/art/systems/current.ts
   var current = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
     const particleCount = Math.round(600 + genome.density * 2600);
     const stepsPerParticle = Math.round(60 + (1 - genome.turbulence) * 260);
     const scale = 7e-4 + genome.turbulence * 22e-4;
@@ -2693,12 +2891,13 @@ button:disabled {
       let y = rng.range(-unit * 0.1, height + unit * 0.1);
       const tone = rng.next();
       const color = tone > 0.94 ? palette.accent : palette.marks[rng.int(0, palette.marks.length - 1)];
+      const loudness = arcAt(x / width);
       ctx.strokeStyle = color;
-      ctx.globalAlpha = 0.05 + rng.next() * (0.12 + genome.weight * 0.2);
+      ctx.globalAlpha = (0.05 + rng.next() * (0.12 + genome.weight * 0.2)) * loudness;
       ctx.lineWidth = lineWidth * rng.range(0.5, 1.9);
       ctx.beginPath();
       ctx.moveTo(x, y);
-      const life = Math.round(stepsPerParticle * rng.range(0.35, 1.2));
+      const life = Math.round(stepsPerParticle * rng.range(0.35, 1.2) * loudness);
       for (let s = 0; s < life; s += 1) {
         const n = noise(x * scale, y * scale);
         const fieldAngle = n * Math.PI * 4;
@@ -2778,7 +2977,7 @@ button:disabled {
       ctx.stroke();
       if (i % 20 === 0) yield 0.05 + i / rayCount * 0.55;
     }
-    const orbitCount = Math.round(4 + genome.density * 22);
+    const orbitCount = Math.round(4 + genome.density * 22 + (genome.heard ? genome.sections * 2 : 0));
     for (let i = 0; i < orbitCount; i += 1) {
       const r = coreRadius * 1.5 + (maxRadius - coreRadius) * ((i + rng.range(0, 0.6)) / orbitCount);
       const start = rng.range(0, Math.PI * 2);
@@ -2812,18 +3011,19 @@ button:disabled {
 
   // src/art/systems/strata.ts
   var strata = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
     const bandCount = Math.round(14 + genome.density * 70);
     const roughness = unit * (4e-3 + genome.turbulence * 0.05);
     const scale = 16e-4 + genome.turbulence * 4e-3;
     let y = height * rng.range(1.02, 1.12);
     let index = 0;
     while (y > -height * 0.1 && index < bandCount * 2) {
-      const thickness = height / bandCount * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25);
+      const loudness = arcAt(1 - y / height);
+      const thickness = height / bandCount * rng.range(0.35, 1.75) * (1 - genome.gravity * 0.25) * loudness;
       const top = y - thickness;
       const color = index % 7 === 0 ? palette.accent : palette.marks[index % palette.marks.length];
       ctx.fillStyle = color;
-      ctx.globalAlpha = 0.2 + rng.next() * (0.35 + genome.weight * 0.4);
+      ctx.globalAlpha = (0.2 + rng.next() * (0.35 + genome.weight * 0.4)) * loudness;
       ctx.beginPath();
       ctx.moveTo(-roughness, y);
       const segments = Math.max(24, Math.round(width / 12));
@@ -3036,7 +3236,7 @@ button:disabled {
 
   // src/art/systems/constellation.ts
   var constellation = function* (env) {
-    const { ctx, width, height, unit, palette, genome, rng, noise } = env;
+    const { ctx, width, height, unit, palette, genome, rng, noise, arcAt } = env;
     const clouds = Math.round(6 + genome.density * 20);
     ctx.globalCompositeOperation = "lighter";
     for (let i = 0; i < clouds; i += 1) {
@@ -3061,7 +3261,7 @@ button:disabled {
       attempts += 1;
       const x = rng.range(0, width);
       const y = rng.range(0, height);
-      const clusterBias = noise(x * 18e-4, y * 18e-4);
+      const clusterBias = noise(x * 18e-4, y * 18e-4) * arcAt(x / width);
       if (rng.next() > clusterBias * (0.5 + genome.density)) continue;
       stars.push({
         x,
@@ -3331,6 +3531,18 @@ button:disabled {
   };
 
   // src/art/renderer.ts
+  function makeArcSampler(arc) {
+    if (arc.length < 2) return () => 1;
+    return (t) => {
+      const clamped = t < 0 ? 0 : t > 1 ? 1 : t;
+      const position = clamped * (arc.length - 1);
+      const index = Math.floor(position);
+      const next = Math.min(arc.length - 1, index + 1);
+      const frac = position - index;
+      const value = arc[index] * (1 - frac) + arc[next] * frac;
+      return 0.45 + value * 0.55;
+    };
+  }
   var SYSTEMS = {
     current,
     radiance,
@@ -3398,6 +3610,7 @@ button:disabled {
       valence: genome.valence,
       arousal: genome.arousal,
       forceNocturne: genome.forceNocturne,
+      brightness: genome.brightness,
       rng
     });
     const env = {
@@ -3408,7 +3621,8 @@ button:disabled {
       palette,
       genome,
       rng,
-      noise: makeNoise2D(genome.seed ^ 1542469173)
+      noise: makeNoise2D(genome.seed ^ 1542469173),
+      arcAt: makeArcSampler(genome.arc)
     };
     layGround(env);
     const iterator = SYSTEMS[genome.system](env);
@@ -3442,6 +3656,502 @@ button:disabled {
     };
   }
 
+  // src/audio/decode.ts
+  var ANALYSIS_RATE = 22050;
+  var SUPPORTED_HINT = "MP3, WAV, M4A, FLAC, OGG, or WebM";
+  async function decodeToBuffer(data) {
+    const context = new OfflineAudioContext(1, 1, ANALYSIS_RATE);
+    try {
+      return await context.decodeAudioData(data);
+    } catch {
+      throw new Error(
+        `This browser could not decode that file. Try ${SUPPORTED_HINT}.`
+      );
+    }
+  }
+  async function decodeBlob(blob) {
+    return decodeToBuffer(await blob.arrayBuffer());
+  }
+  async function decodeFile(file) {
+    if (file.size === 0) throw new Error("That file is empty.");
+    if (file.size > 200 * 1024 * 1024) {
+      throw new Error("That file is too large to decode in a browser tab.");
+    }
+    return decodeToBuffer(await file.arrayBuffer());
+  }
+
+  // src/audio/fft.ts
+  var FFT = class {
+    constructor(size) {
+      __publicField(this, "size");
+      __publicField(this, "cosTable");
+      __publicField(this, "sinTable");
+      __publicField(this, "reverseTable");
+      if (size <= 0 || (size & size - 1) !== 0) {
+        throw new Error(`FFT size must be a power of two, got ${size}`);
+      }
+      this.size = size;
+      this.cosTable = new Float32Array(size / 2);
+      this.sinTable = new Float32Array(size / 2);
+      for (let i = 0; i < size / 2; i += 1) {
+        this.cosTable[i] = Math.cos(-2 * Math.PI * i / size);
+        this.sinTable[i] = Math.sin(-2 * Math.PI * i / size);
+      }
+      this.reverseTable = new Uint32Array(size);
+      let bits = 0;
+      while (1 << bits < size) bits += 1;
+      for (let i = 0; i < size; i += 1) {
+        let reversed = 0;
+        for (let b = 0; b < bits; b += 1) {
+          reversed = reversed << 1 | i >>> b & 1;
+        }
+        this.reverseTable[i] = reversed;
+      }
+    }
+    /**
+     * In-place complex FFT. `real` and `imag` must both be `size` long.
+     */
+    transform(real, imag) {
+      const n = this.size;
+      for (let i = 0; i < n; i += 1) {
+        const j = this.reverseTable[i];
+        if (j > i) {
+          const tr = real[i];
+          real[i] = real[j];
+          real[j] = tr;
+          const ti = imag[i];
+          imag[i] = imag[j];
+          imag[j] = ti;
+        }
+      }
+      for (let size = 2; size <= n; size <<= 1) {
+        const half = size >> 1;
+        const step = n / size;
+        for (let i = 0; i < n; i += size) {
+          for (let j = i, k = 0; j < i + half; j += 1, k += step) {
+            const cos = this.cosTable[k];
+            const sin = this.sinTable[k];
+            const jr = real[j + half];
+            const ji = imag[j + half];
+            const tr = jr * cos - ji * sin;
+            const ti = jr * sin + ji * cos;
+            real[j + half] = real[j] - tr;
+            imag[j + half] = imag[j] - ti;
+            real[j] = real[j] + tr;
+            imag[j] = imag[j] + ti;
+          }
+        }
+      }
+    }
+    /** Magnitude spectrum of a real signal. Returns size/2 bins. */
+    magnitudes(input, out, window2) {
+      const n = this.size;
+      const real = new Float32Array(n);
+      const imag = new Float32Array(n);
+      for (let i = 0; i < n; i += 1) {
+        real[i] = (input[i] ?? 0) * window2[i];
+      }
+      this.transform(real, imag);
+      for (let i = 0; i < n / 2; i += 1) {
+        const re = real[i];
+        const im = imag[i];
+        out[i] = Math.sqrt(re * re + im * im);
+      }
+    }
+  };
+  function hannWindow(size) {
+    const w = new Float32Array(size);
+    for (let i = 0; i < size; i += 1) {
+      w[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (size - 1)));
+    }
+    return w;
+  }
+
+  // src/audio/types.ts
+  var PITCH_NAMES = ["C", "C\u266F", "D", "E\u266D", "E", "F", "F\u266F", "G", "A\u266D", "A", "B\u266D", "B"];
+
+  // src/audio/features.ts
+  var FRAME = 2048;
+  var HOP = 512;
+  var MAX_SECONDS = 600;
+  var MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  var MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  function clamp3(v, lo, hi) {
+    return v < lo ? lo : v > hi ? hi : v;
+  }
+  function mean(values) {
+    if (values.length === 0) return 0;
+    let sum = 0;
+    for (let i = 0; i < values.length; i += 1) sum += values[i];
+    return sum / values.length;
+  }
+  function correlate(a, b) {
+    const ma = mean(a);
+    const mb = mean(b);
+    let num = 0;
+    let da = 0;
+    let db = 0;
+    for (let i = 0; i < a.length; i += 1) {
+      const x = a[i] - ma;
+      const y = b[i] - mb;
+      num += x * y;
+      da += x * x;
+      db += y * y;
+    }
+    const den = Math.sqrt(da * db);
+    return den === 0 ? 0 : num / den;
+  }
+  function detectKey(chroma) {
+    const values = Array.from(chroma);
+    const total = values.reduce((a, b) => a + b, 0);
+    if (total <= 0) return { keyIndex: 0, mode: "major", confidence: 0 };
+    let best = { keyIndex: 0, mode: "major", score: -Infinity };
+    let second = -Infinity;
+    for (let tonic = 0; tonic < 12; tonic += 1) {
+      for (const [mode, profile] of [
+        ["major", MAJOR_PROFILE],
+        ["minor", MINOR_PROFILE]
+      ]) {
+        const rotated = Array.from({ length: 12 }, (_, i) => values[(i + tonic) % 12]);
+        const score = correlate(rotated, profile);
+        if (score > best.score) {
+          second = best.score;
+          best = { keyIndex: tonic, mode, score };
+        } else if (score > second) {
+          second = score;
+        }
+      }
+    }
+    const margin = Number.isFinite(second) ? best.score - second : 0;
+    return {
+      keyIndex: best.keyIndex,
+      mode: best.mode,
+      confidence: clamp3(margin * 4, 0, 1)
+    };
+  }
+  function detectTempo(onsets, hopSeconds) {
+    if (onsets.length < 16) return { tempo: 0, clarity: 0 };
+    const avg = mean(onsets);
+    const centered = onsets.map((v) => v - avg);
+    const minLag = Math.max(2, Math.floor(60 / (200 * hopSeconds)));
+    const maxLag = Math.min(centered.length - 1, Math.ceil(60 / (55 * hopSeconds)));
+    if (maxLag <= minLag) return { tempo: 0, clarity: 0 };
+    let bestLag = minLag;
+    let bestScore = -Infinity;
+    const scores = [];
+    for (let lag = minLag; lag <= maxLag; lag += 1) {
+      let sum = 0;
+      for (let i = 0; i + lag < centered.length; i += 1) {
+        sum += centered[i] * centered[i + lag];
+      }
+      const raw = sum / (centered.length - lag);
+      const bpm = 60 / (lag * hopSeconds);
+      const preference = Math.exp(-0.5 * (Math.log2(bpm / 120) / 0.9) ** 2);
+      const score = raw * preference;
+      scores.push(score);
+      if (score > bestScore) {
+        bestScore = score;
+        bestLag = lag;
+      }
+    }
+    const scoreAvg = mean(scores);
+    const scoreSpread = Math.sqrt(mean(scores.map((v) => (v - scoreAvg) ** 2)));
+    const clarity = scoreSpread > 0 ? clamp3(((bestScore - scoreAvg) / scoreSpread - 0.8) / 2.6, 0, 1) : 0;
+    const idx = bestLag - minLag;
+    const prev = scores[idx - 1];
+    const next = scores[idx + 1];
+    let refined = bestLag;
+    if (prev !== void 0 && next !== void 0) {
+      const denom = prev - 2 * bestScore + next;
+      if (denom !== 0) refined = bestLag + 0.5 * (prev - next) / denom;
+    }
+    let tempo = 60 / (refined * hopSeconds);
+    while (tempo > 0 && tempo < 50) tempo *= 2;
+    while (tempo > 205) tempo /= 2;
+    return { tempo, clarity };
+  }
+  function detectSections(profiles) {
+    if (profiles.length < 8) return 1;
+    const novelty = [];
+    for (let i = 1; i < profiles.length; i += 1) {
+      const a = profiles[i - 1];
+      const b = profiles[i];
+      let distance = 0;
+      for (let k = 0; k < a.length; k += 1) {
+        const d = a[k] - b[k];
+        distance += d * d;
+      }
+      novelty.push(Math.sqrt(distance));
+    }
+    const smoothed = [];
+    for (let i = 0; i < novelty.length; i += 1) {
+      const window2 = novelty.slice(Math.max(0, i - 2), Math.min(novelty.length, i + 3));
+      smoothed.push(mean(window2));
+    }
+    const avg = mean(smoothed);
+    const spread = Math.sqrt(mean(smoothed.map((v) => (v - avg) ** 2)));
+    const threshold = avg + spread * 2.2;
+    let count = 1;
+    let cooldown = 0;
+    for (const value of smoothed) {
+      if (cooldown > 0) {
+        cooldown -= 1;
+        continue;
+      }
+      if (value > threshold) {
+        count += 1;
+        cooldown = 8;
+      }
+    }
+    return clamp3(count, 1, 10);
+  }
+  function* extractFeatures(buffer, source) {
+    const sampleRate = buffer.sampleRate;
+    const maxSamples = Math.floor(MAX_SECONDS * sampleRate);
+    const totalSamples = Math.min(buffer.length, maxSamples);
+    const truncated = buffer.length > maxSamples;
+    const left = buffer.getChannelData(0);
+    const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : null;
+    let stereoWidth = 0;
+    if (right) {
+      const step = Math.max(1, Math.floor(totalSamples / 4e4));
+      const l = [];
+      const r = [];
+      for (let i = 0; i < totalSamples; i += step) {
+        l.push(left[i]);
+        r.push(right[i]);
+      }
+      stereoWidth = clamp3(1 - Math.abs(correlate(l, r)), 0, 1);
+    }
+    yield { progress: 0.04, stage: "Downmixing" };
+    const mono = new Float32Array(totalSamples);
+    for (let i = 0; i < totalSamples; i += 1) {
+      mono[i] = right ? (left[i] + right[i]) / 2 : left[i];
+    }
+    const fft = new FFT(FRAME);
+    const window2 = hannWindow(FRAME);
+    const bins = FRAME / 2;
+    const spectrum = new Float32Array(bins);
+    let previous = new Float32Array(bins);
+    const frameCount = Math.max(1, Math.floor((totalSamples - FRAME) / HOP));
+    const rmsFrames = [];
+    const centroids = [];
+    const flatnesses = [];
+    const fluxes = [];
+    const onsets = [];
+    const chroma = new Float64Array(12);
+    const sectionProfiles = [];
+    const superFrameSize = Math.max(1, Math.floor(frameCount / 160));
+    let superCentroid = 0;
+    let superFlatness = 0;
+    let superCount = 0;
+    const binFrequency = new Float32Array(bins);
+    const binPitchClass = new Int8Array(bins);
+    for (let k = 0; k < bins; k += 1) {
+      const freq = k * sampleRate / FRAME;
+      binFrequency[k] = freq;
+      if (freq >= 55 && freq <= 2200) {
+        const midi = 69 + 12 * Math.log2(freq / 440);
+        binPitchClass[k] = (Math.round(midi) % 12 + 12) % 12;
+      } else {
+        binPitchClass[k] = -1;
+      }
+    }
+    const frameBuffer = new Float32Array(FRAME);
+    for (let f = 0; f < frameCount; f += 1) {
+      const offset = f * HOP;
+      frameBuffer.set(mono.subarray(offset, offset + FRAME));
+      fft.magnitudes(frameBuffer, spectrum, window2);
+      let sum = 0;
+      let weighted = 0;
+      let logSum = 0;
+      let flux2 = 0;
+      let rms = 0;
+      for (let k = 0; k < bins; k += 1) {
+        const mag = spectrum[k];
+        sum += mag;
+        weighted += mag * binFrequency[k];
+        logSum += Math.log(mag + 1e-10);
+        const diff = mag - previous[k];
+        if (diff > 0) flux2 += diff;
+        const pc = binPitchClass[k];
+        if (pc >= 0) chroma[pc] = chroma[pc] + mag;
+      }
+      for (let i = offset; i < offset + FRAME; i += 8) {
+        const s = mono[i];
+        rms += s * s;
+      }
+      rms = Math.sqrt(rms / (FRAME / 8));
+      const centroid = sum > 0 ? weighted / sum : 0;
+      const arithmetic = sum / bins;
+      const geometric = Math.exp(logSum / bins);
+      const flatness = arithmetic > 0 ? geometric / arithmetic : 0;
+      rmsFrames.push(rms);
+      centroids.push(centroid);
+      flatnesses.push(flatness);
+      fluxes.push(flux2);
+      onsets.push(flux2);
+      superCentroid += centroid / 5e3;
+      superFlatness += flatness;
+      superCount += 1;
+      if (superCount >= superFrameSize) {
+        const profile = [];
+        profile.push(superCentroid / superCount);
+        profile.push(superFlatness / superCount);
+        let chromaSum = 0;
+        const localChroma = new Float64Array(12);
+        for (let k = 0; k < bins; k += 1) {
+          const pc = binPitchClass[k];
+          if (pc >= 0) {
+            localChroma[pc] = localChroma[pc] + spectrum[k];
+            chromaSum += spectrum[k];
+          }
+        }
+        for (let pc = 0; pc < 12; pc += 1) {
+          profile.push(chromaSum > 0 ? localChroma[pc] / chromaSum : 0);
+        }
+        sectionProfiles.push(profile);
+        superCentroid = 0;
+        superFlatness = 0;
+        superCount = 0;
+      }
+      previous.set(spectrum);
+      if (f % 48 === 0) {
+        yield { progress: 0.04 + f / frameCount * 0.86, stage: "Listening" };
+      }
+    }
+    yield { progress: 0.93, stage: "Finding the pulse" };
+    const hopSeconds = HOP / sampleRate;
+    const { tempo, clarity } = detectTempo(onsets, hopSeconds);
+    const key = detectKey(chroma);
+    const fluxAvg = mean(fluxes);
+    const fluxPeak = Math.max(...fluxes, 1e-9);
+    let onsetCount = 0;
+    for (let i = 1; i < fluxes.length - 1; i += 1) {
+      const v = fluxes[i];
+      if (v > fluxAvg * 1.6 && v >= fluxes[i - 1] && v > fluxes[i + 1]) {
+        onsetCount += 1;
+      }
+    }
+    const seconds = totalSamples / sampleRate;
+    const onsetDensity = clamp3(onsetCount / seconds / 6, 0, 1);
+    const meanRms = mean(rmsFrames);
+    const energy = clamp3((20 * Math.log10(meanRms + 1e-9) + 55) / 50, 0, 1);
+    const rmsDb = rmsFrames.map((v) => 20 * Math.log10(v + 1e-9));
+    const dbAvg = mean(rmsDb);
+    const dbSpread = Math.sqrt(mean(rmsDb.map((v) => (v - dbAvg) ** 2)));
+    const dynamicRange = clamp3(dbSpread / 14, 0, 1);
+    const meanCentroid = mean(centroids);
+    const brightness = clamp3((Math.log2(meanCentroid + 20) - Math.log2(120)) / (Math.log2(5200) - Math.log2(120)), 0, 1);
+    const roughness = clamp3(mean(flatnesses) * 3.2, 0, 1);
+    const flux = clamp3(fluxAvg / (fluxPeak * 0.35), 0, 1);
+    const arcPoints = 64;
+    const arc = [];
+    const bucket = Math.max(1, Math.floor(rmsFrames.length / arcPoints));
+    for (let i = 0; i < arcPoints; i += 1) {
+      const slice = rmsFrames.slice(i * bucket, (i + 1) * bucket);
+      arc.push(slice.length > 0 ? mean(slice) : 0);
+    }
+    const arcPeak = Math.max(...arc, 1e-9);
+    const normalizedArc = arc.map((v) => clamp3(v / arcPeak, 0, 1));
+    yield { progress: 0.99, stage: "Reading the structure" };
+    return {
+      source,
+      duration: seconds,
+      truncated,
+      tempo,
+      pulseClarity: clarity,
+      onsetDensity,
+      energy,
+      dynamicRange,
+      brightness,
+      roughness,
+      flux,
+      keyIndex: key.keyIndex,
+      mode: key.mode,
+      keyConfidence: key.confidence,
+      keyName: `${PITCH_NAMES[key.keyIndex]} ${key.mode}`,
+      stereoWidth,
+      sections: detectSections(sectionProfiles),
+      arc: normalizedArc
+    };
+  }
+
+  // src/audio/live.ts
+  function tabCaptureSupported() {
+    return typeof navigator !== "undefined" && !!navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function" && typeof MediaRecorder !== "undefined";
+  }
+  function pickMimeType() {
+    const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
+    for (const type of candidates) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return void 0;
+  }
+  async function captureTabAudio() {
+    if (!tabCaptureSupported()) {
+      throw new Error("This browser cannot capture tab audio. Chrome or Edge can, or drop an audio file instead.");
+    }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+      });
+    } catch (error) {
+      const denied = error instanceof DOMException && error.name === "NotAllowedError";
+      throw new Error(
+        denied ? "Screen sharing was declined, so there is nothing to listen to." : "Could not start tab capture in this browser."
+      );
+    }
+    for (const track of stream.getVideoTracks()) {
+      track.stop();
+      stream.removeTrack(track);
+    }
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      for (const track of stream.getTracks()) track.stop();
+      throw new Error(
+        'That share included no audio. Pick a browser tab and tick "Also share tab audio".'
+      );
+    }
+    const mimeType = pickMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : void 0);
+    const chunks = [];
+    recorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    });
+    const endedCallbacks = [];
+    const firstTrack = audioTracks[0];
+    const result = new Promise((resolve, reject) => {
+      recorder.addEventListener("stop", () => {
+        for (const track of stream.getTracks()) track.stop();
+        const blob = new Blob(chunks, { type: mimeType ?? "audio/webm" });
+        if (blob.size === 0) {
+          reject(new Error("No audio was captured. Make sure the tab was actually playing."));
+          return;
+        }
+        resolve(blob);
+      });
+      recorder.addEventListener("error", () => {
+        for (const track of stream.getTracks()) track.stop();
+        reject(new Error("Recording failed partway through."));
+      });
+    });
+    firstTrack.addEventListener("ended", () => {
+      if (recorder.state !== "inactive") recorder.stop();
+      for (const callback of endedCallbacks) callback();
+    });
+    recorder.start(1e3);
+    return {
+      result,
+      stop: () => {
+        if (recorder.state !== "inactive") recorder.stop();
+      },
+      onEnded: (callback) => endedCallbacks.push(callback)
+    };
+  }
+
   // src/ui/app.ts
   var FORMATS = {
     portrait: { width: 1400, height: 1750, label: "4:5" },
@@ -3454,6 +4164,28 @@ button:disabled {
     if (!element) throw new Error(`Missing element #${id}`);
     return element;
   }
+  function runProgressively(iterator, onProgress) {
+    return new Promise((resolve, reject) => {
+      const step = () => {
+        try {
+          const deadline = performance.now() + 14;
+          let result = iterator.next();
+          while (!result.done && performance.now() < deadline) {
+            result = iterator.next();
+          }
+          if (result.done) {
+            resolve(result.value);
+            return;
+          }
+          onProgress(result.value.progress, result.value.stage);
+          requestAnimationFrame(step);
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error("Audio analysis failed."));
+        }
+      };
+      requestAnimationFrame(step);
+    });
+  }
   function mountApp() {
     const form = must("intake-form");
     const urlInput = must("url-input");
@@ -3462,6 +4194,16 @@ button:disabled {
     const fallback = must("fallback");
     const lyricsInput = must("lyrics-input");
     const readPasted = must("read-pasted");
+    const dropZone = must("drop-zone");
+    const audioInput = must("audio-input");
+    const chooseAudio = must("choose-audio");
+    const listenTab = must("listen-tab");
+    const audioStatus = must("audio-status");
+    const audioProgress = must("audio-progress");
+    const audioProgressBar = must("audio-progress-bar");
+    const heardBlock = must("heard-block");
+    const audioMetrics = must("audio-metrics");
+    const heardNotes = must("heard-notes");
     const readingEl = must("reading");
     const nowReading = must("now-reading");
     const verdictEl = must("verdict");
@@ -3482,6 +4224,8 @@ button:disabled {
     let subject = null;
     let activeRender = null;
     let inFlight = null;
+    let audio = null;
+    let capture = null;
     function setStatus(message, tone = "idle") {
       statusEl.textContent = message;
       statusEl.classList.toggle("working", tone === "working");
@@ -3558,8 +4302,47 @@ button:disabled {
         metricsEl.append(wrapper);
       }
     }
+    function renderAudioPanel(features, reading) {
+      if (!features) {
+        heardBlock.hidden = true;
+        return;
+      }
+      const entries = [
+        ["Tempo", features.tempo > 0 ? String(Math.round(features.tempo)) : "\u2014", features.tempo > 0 ? "bpm" : void 0],
+        ["Key", features.keyConfidence > 0.28 ? features.keyName : "unsettled"],
+        ["Loudness", `${Math.round(features.energy * 100)}%`],
+        ["Dynamics", `${Math.round(features.dynamicRange * 100)}%`],
+        ["Brightness", `${Math.round(features.brightness * 100)}%`],
+        ["Roughness", `${Math.round(features.roughness * 100)}%`],
+        ["Pulse", `${Math.round(features.pulseClarity * 100)}%`],
+        ["Sections", String(features.sections)]
+      ];
+      audioMetrics.replaceChildren();
+      for (const [label, value, suffix] of entries) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "metric";
+        const dt = document.createElement("dt");
+        dt.textContent = label;
+        const dd = document.createElement("dd");
+        dd.textContent = value;
+        if (suffix) {
+          const note = document.createElement("span");
+          note.textContent = suffix;
+          dd.append(note);
+        }
+        wrapper.append(dt, dd);
+        audioMetrics.append(wrapper);
+      }
+      heardNotes.replaceChildren();
+      for (const note of reading.heardNotes) {
+        const li = document.createElement("li");
+        li.textContent = note;
+        heardNotes.append(li);
+      }
+      heardBlock.hidden = false;
+    }
     function renderReading(analysis, genome, current2) {
-      const reading = explain(analysis, genome);
+      const reading = explain(analysis, genome, audio);
       nowReading.replaceChildren();
       const label = document.createElement("strong");
       label.textContent = current2.title;
@@ -3569,6 +4352,14 @@ button:disabled {
       }
       nowReading.append(document.createElement("br"));
       nowReading.append(document.createTextNode(current2.sourceLabel));
+      if (audio) {
+        nowReading.append(document.createElement("br"));
+        nowReading.append(
+          document.createTextNode(
+            `Heard ${Math.round(audio.duration)}s of audio via ${audio.source === "tab" ? "tab capture" : "file"}`
+          )
+        );
+      }
       verdictEl.textContent = reading.verdict;
       systemName.textContent = reading.systemLabel;
       systemDescription.textContent = reading.systemDescription;
@@ -3578,6 +4369,7 @@ button:disabled {
         li.textContent = note;
         notesEl.append(li);
       }
+      renderAudioPanel(audio, reading);
       renderThemes(analysis);
       renderMetrics(analysis, genome);
       signatureEl.replaceChildren();
@@ -3594,7 +4386,7 @@ button:disabled {
     function paint() {
       if (!subject) return;
       activeRender?.cancel();
-      const genome = interpret(subject.analysis, subject.variation);
+      const genome = interpret(subject.analysis, audio, subject.variation);
       const format = FORMATS[formatSelect.value] ?? FORMATS.portrait;
       renderReading(subject.analysis, genome, subject);
       frameEmpty.hidden = true;
@@ -3609,7 +4401,7 @@ button:disabled {
       plate.append(plateTitle);
       plate.append(
         document.createTextNode(
-          ` \xB7 ${genome.system} \xB7 ${format.label} \xB7 seed ${genome.seed.toString(16)}` + (subject.variation > 0 ? ` \xB7 var ${subject.variation}` : "")
+          ` \xB7 ${genome.system} \xB7 ${format.label} \xB7 ${genome.heard ? "heard + read" : "read only"} \xB7 seed ${genome.seed.toString(16)}` + (subject.variation > 0 ? ` \xB7 var ${subject.variation}` : "")
         )
       );
       activeRender = render(canvas, genome, {
@@ -3714,6 +4506,106 @@ button:disabled {
     });
     formatSelect.addEventListener("change", () => {
       if (subject) paint();
+    });
+    function setAudioStatus(message, tone = "idle") {
+      audioStatus.textContent = message;
+      audioStatus.classList.toggle("working", tone === "working");
+      audioStatus.classList.toggle("error", tone === "error");
+    }
+    function setAudioBusy(busy) {
+      chooseAudio.disabled = busy;
+      if (busy) listenTab.disabled = true;
+      else listenTab.disabled = !tabCaptureSupported();
+      audioProgress.hidden = !busy;
+      if (busy) audioProgressBar.style.width = "0%";
+    }
+    async function ingestAudio(buffer, source) {
+      const features = await runProgressively(extractFeatures(buffer, source), (progress2, stage) => {
+        audioProgressBar.style.width = `${Math.round(progress2 * 100)}%`;
+        setAudioStatus(`${stage}\u2026`, "working");
+      });
+      audio = features;
+      setAudioStatus(
+        `Heard ${Math.round(features.duration)}s${features.tempo > 0 ? ` \xB7 ${Math.round(features.tempo)} BPM` : ""}${features.keyConfidence > 0.28 ? ` \xB7 ${features.keyName}` : ""}. ` + (subject ? "Repainting with sound." : "Now add a song link or lyrics.")
+      );
+      if (subject) paint();
+    }
+    function handleAudioError(error) {
+      const message = error instanceof Error ? error.message : "Could not read that audio.";
+      setAudioStatus(message, "error");
+    }
+    async function ingestFile(file) {
+      setAudioBusy(true);
+      setAudioStatus("Decoding\u2026", "working");
+      try {
+        const buffer = await decodeFile(file);
+        await ingestAudio(buffer, "file");
+      } catch (error) {
+        handleAudioError(error);
+      } finally {
+        setAudioBusy(false);
+      }
+    }
+    chooseAudio.addEventListener("click", () => audioInput.click());
+    audioInput.addEventListener("change", () => {
+      const file = audioInput.files?.[0];
+      if (file) void ingestFile(file);
+      audioInput.value = "";
+    });
+    for (const eventName of ["dragenter", "dragover"]) {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.add("is-dragging");
+      });
+    }
+    for (const eventName of ["dragleave", "dragend"]) {
+      dropZone.addEventListener(eventName, () => dropZone.classList.remove("is-dragging"));
+    }
+    dropZone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      dropZone.classList.remove("is-dragging");
+      const file = event.dataTransfer?.files?.[0];
+      if (file) void ingestFile(file);
+    });
+    window.addEventListener("dragover", (event) => event.preventDefault());
+    window.addEventListener("drop", (event) => event.preventDefault());
+    listenTab.disabled = !tabCaptureSupported();
+    if (!tabCaptureSupported()) {
+      listenTab.title = "Tab audio capture needs Chrome or Edge.";
+    }
+    listenTab.addEventListener("click", () => {
+      if (capture) {
+        capture.stop();
+        capture = null;
+        listenTab.textContent = "Listen to a tab";
+        setAudioStatus("Finishing the recording\u2026", "working");
+        return;
+      }
+      void (async () => {
+        try {
+          const session = await captureTabAudio();
+          capture = session;
+          listenTab.textContent = "Stop listening";
+          setAudioStatus("Listening \u2014 play the song, then press stop.", "working");
+          session.onEnded(() => {
+            capture = null;
+            listenTab.textContent = "Listen to a tab";
+          });
+          const blob = await session.result;
+          capture = null;
+          listenTab.textContent = "Listen to a tab";
+          setAudioBusy(true);
+          setAudioStatus("Decoding what it heard\u2026", "working");
+          const buffer = await decodeBlob(blob);
+          await ingestAudio(buffer, "tab");
+        } catch (error) {
+          capture = null;
+          listenTab.textContent = "Listen to a tab";
+          handleAudioError(error);
+        } finally {
+          setAudioBusy(false);
+        }
+      })();
     });
     download.addEventListener("click", () => {
       if (!subject) return;
