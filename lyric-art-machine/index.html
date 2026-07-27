@@ -157,6 +157,30 @@
             </label>
             <button type="button" class="secondary" id="download" disabled>Download PNG</button>
           </div>
+
+          <!-- Pen plotter export -->
+          <div class="plot-bar">
+            <label class="select-field">
+              <span>Paper</span>
+              <select id="paper-select">
+                <option value="a4" selected>A4 · 210×297mm</option>
+                <option value="a3">A3 · 297×420mm</option>
+                <option value="a5">A5 · 148×210mm</option>
+                <option value="letter">Letter · 216×279mm</option>
+                <option value="square200">Square · 200×200mm</option>
+              </select>
+            </label>
+            <label class="select-field">
+              <span>Detail</span>
+              <select id="detail-select">
+                <option value="1.6">Coarse · fastest plot</option>
+                <option value="0.7" selected>Normal</option>
+                <option value="0.25">Fine · slowest plot</option>
+              </select>
+            </label>
+            <button type="button" class="secondary" id="download-svg" disabled>Download SVG</button>
+          </div>
+          <p class="plate" id="plot-stats"></p>
           <p class="plate" id="plate"></p>
         </section>
       </main>

@@ -10,7 +10,8 @@
 import { analyze, type SongAnalysis } from '../analysis/analyze';
 import { explain, interpret, type ArtGenome } from '../analysis/interpret';
 import { acquire, type LyricsResult, type TrackGuess, type VideoMeta } from '../lyrics';
-import { render, type RenderHandle } from '../art/renderer';
+import { render, type RenderHandle, type RenderResult } from '../art/renderer';
+import { DEFAULT_PLOT_OPTIONS, toPlotterSvg, type PaperKey } from '../art/svg';
 import { STYLES } from '../art/catalog';
 import { ENGINE_BY_KEY } from '../art/engines';
 import { TREATMENT_BY_KEY } from '../art/treatments';
@@ -113,6 +114,10 @@ export function mountApp(): void {
   const progressBar = must<HTMLElement>('progress-bar');
   const revariate = must<HTMLButtonElement>('revariate');
   const download = must<HTMLButtonElement>('download');
+  const downloadSvg = must<HTMLButtonElement>('download-svg');
+  const paperSelect = must<HTMLSelectElement>('paper-select');
+  const detailSelect = must<HTMLSelectElement>('detail-select');
+  const plotStats = must<HTMLElement>('plot-stats');
   const formatSelect = must<HTMLSelectElement>('format');
   const plate = must<HTMLElement>('plate');
 
@@ -122,6 +127,8 @@ export function mountApp(): void {
   /** Persists across songs: audio, once heard, keeps informing the picture. */
   let audio: AudioFeatures | null = null;
   let capture: CaptureSession | null = null;
+  /** Geometry from the most recent render — what the plotter would draw. */
+  let lastRender: RenderResult | null = null;
 
   // ---------------------------------------------------------------- status
 
@@ -332,6 +339,11 @@ export function mountApp(): void {
     canvas.classList.remove('is-visible');
     revariate.disabled = true;
     download.disabled = true;
+    // Both exports must go dead for the duration of the render, or a click
+    // mid-render would hand back the previous piece's geometry.
+    downloadSvg.disabled = true;
+    lastRender = null;
+    plotStats.textContent = '';
 
     plate.replaceChildren();
     const plateTitle = document.createElement('strong');
@@ -355,11 +367,14 @@ export function mountApp(): void {
 
     canvas.classList.add('is-visible');
 
-    void activeRender.done.then(() => {
+    void activeRender.done.then((result) => {
+      lastRender = result;
       progress.hidden = true;
       revariate.disabled = false;
       download.disabled = false;
+      downloadSvg.disabled = false;
       styleSelect.disabled = false;
+      describePlot();
     }).catch((error: unknown) => {
       progress.hidden = true;
       setStatus(error instanceof Error ? error.message : 'Rendering failed.', 'error');
@@ -643,6 +658,78 @@ export function mountApp(): void {
         setAudioBusy(false);
       }
     })();
+  });
+
+  // ---------------------------------------------------------------- plotting
+
+  function currentPlotOptions() {
+    return {
+      ...DEFAULT_PLOT_OPTIONS,
+      paper: paperSelect.value as PaperKey,
+      tolerance: Number(detailSelect.value) || DEFAULT_PLOT_OPTIONS.tolerance,
+    };
+  }
+
+  function buildPlot(): { svg: string; summary: string } | null {
+    if (!lastRender) return null;
+    const format = FORMATS[(formatSelect.value as FormatKey)] ?? FORMATS.portrait;
+    const { svg, stats } = toPlotterSvg(
+      lastRender.marks,
+      format.width,
+      format.height,
+      lastRender.palette,
+      currentPlotOptions(),
+      `${subject?.title ?? 'Untitled'} — ${lastRender.style.name}`,
+    );
+
+    const minutes = stats.estimatedMinutes;
+    const time = minutes < 1
+      ? 'under a minute'
+      : minutes < 90
+        ? `~${Math.round(minutes)} min`
+        : `~${(minutes / 60).toFixed(1)} hr`;
+
+    const summary =
+      `${stats.paths.toLocaleString()} paths · ${stats.pens} pen${stats.pens === 1 ? '' : 's'} · ` +
+      `${stats.drawLength.toFixed(1)} m of line · ${time} to plot` +
+      (stats.dropped > 0 ? ` · ${stats.dropped.toLocaleString()} specks dropped` : '');
+
+    return { svg, summary };
+  }
+
+  /** Shows what a plot would cost without making the user export to find out. */
+  function describePlot(): void {
+    const plot = buildPlot();
+    if (!plot) {
+      plotStats.textContent = '';
+      return;
+    }
+    const warning = lastRender && !lastRender.treatment.plottable
+      ? ' — this style is screen-only, so the plot will be its line skeleton without the glow or screening'
+      : '';
+    plotStats.textContent = `Plot: ${plot.summary}${warning}`;
+  }
+
+  for (const control of [paperSelect, detailSelect]) {
+    control.addEventListener('change', describePlot);
+  }
+
+  downloadSvg.addEventListener('click', () => {
+    const plot = buildPlot();
+    if (!plot) return;
+    const name = (subject?.title ?? 'interpretation')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 60) || 'interpretation';
+
+    const blob = new Blob([plot.svg], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${name}-${lastRender?.style.key ?? 'plot'}.svg`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
 
   download.addEventListener('click', () => {

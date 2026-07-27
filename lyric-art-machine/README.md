@@ -137,15 +137,24 @@ gravity, weight, symmetry, grain — and a **written reading** explaining each
 decision. The dominant theme picks the visual system; everything else bends its
 parameters:
 
-| Dominant field | System | What it does |
-|---|---|---|
-| motion, water | **Current** | particles traced through a noise field |
-| transcendence, fire, love | **Radiance** | everything organized around a luminous center |
-| memory, loss | **Strata** | horizontal bands, like sediment |
-| defiance | **Fracture** | the plane broken and driven apart |
-| night | **Constellation** | points of light, joined by faint lines |
-| city | **Lattice** | a rigid grid made to carry something it wasn't built for |
-| nature, body | **Growth** | branching forms grown until they run out of energy |
+A **style** is an engine crossed with a treatment.
+
+**17 engines** decide where forms go — Current, Terrain, Swarm, Columns,
+Radiance, Spiral, Orbits, Bloom, Strata, Weave, Moiré, Fracture, Shatter,
+Lattice, Growth, Constellation, Drift.
+
+**12 treatments** decide how a mark is realized — Ink, Cross-hatch, Engraving,
+Stipple, Sketch, Woodcut, Blueprint, Risograph, Screenprint, Wash, Neon,
+Halftone. Treatments run in two stages: a geometry stage that rewrites marks
+(fills become hatching, a sketch redraws every line three times, riso splits
+into offset passes) and a raster finish the plotter path skips entirely.
+
+That crossing gives 204 combinations. **76 are named and catalogued** in
+`catalog.ts`, chosen because the pairing produces something the engine alone
+does not — Growth under Woodcut is not Growth under Engraving. Each declares
+thematic affinity plus preferred energy and grit, so the machine picks one on
+its own; the whole catalogue is browsable from a picker, and screen-only styles
+are labelled.
 
 Colors named in the lyrics override the thematic default — if a song says gold,
 the picture is gold. Hue averaging is circular, so red and violet don't average
@@ -167,9 +176,36 @@ reading says so explicitly.
 
 ### 5. Rendering (`src/art/`)
 
-Systems are **generators** that yield progress, driven across animation frames in
-12 ms slices, so the canvas visibly fills rather than appearing all at once. The
-machine should look like it's working.
+**Engines never touch a canvas.** They emit vector marks into a scene; the
+painter turns those into pixels. Raster effects still apply after
+rasterization, so nothing is lost on screen — but the geometry that made the
+picture exists as data, which is what makes plotter output real rather than a
+bitmap trace.
+
+Rendering runs in four stages, all spread across animation frames in 12 ms
+slices so the canvas visibly fills: build geometry, apply the treatment, paint,
+finish.
+
+### 6. Plotting (`src/art/svg.ts`)
+
+**Download SVG** exports the same marks the painter drew, in millimetres, ready
+for Inkscape and a pen plotter. Four things a pen cannot do are handled at
+export rather than left to you:
+
+- **It cannot fill.** Any region still marked filled becomes hatching.
+- **It cannot draw off the paper.** Marks bleed past the canvas edge by design, so every path is Cohen–Sutherland clipped to the page first.
+- **It cannot draw a million points.** Paths are simplified (Ramer–Douglas–Peucker, three detail levels) and specks under 0.4 mm are dropped.
+- **It has one colour at a time.** Marks are grouped into named Inkscape layers, one per pen, each individually plottable.
+
+Paper is A5/A4/A3/Letter/200 mm square, auto-oriented to the artwork and scaled
+uniformly inside a 12 mm margin — never distorted to fill the sheet. Before you
+export, the interface tells you what the plot will cost: path count, pen count,
+total metres of line, and a rough plotting time.
+
+Screen-only styles still export; you get their line skeleton without the glow
+or screening, and the interface says so. Note that a Blueprint plot inverts —
+bright lines on dark ground become dark lines on white paper, because the paper
+is the paper.
 
 All randomness comes from a seeded `mulberry32` PRNG — `Math.random` appears
 nowhere in the art pipeline. **The same lyrics always produce the same artwork**,
@@ -216,10 +252,26 @@ one with a real loudness swell. The system override was verified end to end
 (calm lyrics + violent audio → Fracture; calm lyrics + gentle audio → Strata
 unchanged), as was the no-audio path, which is unaffected.
 
+**All 76 styles were rendered** in headless Chromium: none fail, none render
+flat, no page errors, median 232 ms. Visual review caught three real faults,
+since fixed — stipple decimated points twice over and so erased short marks
+entirely (two styles rendered nearly blank), weave allowed a mesh fine enough to
+grey into flat tone, and moiré stacked too many faint layers to read as
+interference.
+
+**SVG export was validated structurally**, across five styles and all five paper
+sizes: correct millimetre dimensions, stroke-only output with no fills, Inkscape
+layers present, and every coordinate inside the page margin. Exports were then
+rendered back in a browser and compared against the screen originals. That pass
+caught a stale-state bug: the SVG button stayed live during a re-render, so an
+export mid-render could hand back the *previous* piece's geometry.
+
 **Not verified:** tab capture via `getDisplayMedia`, which needs a real user
 granting a share prompt and cannot be driven headlessly. Its decode-and-analyze
 tail is the same verified code the file path uses; the capture and permission
-handling in front of it is the untested part.
+handling in front of it is the untested part. And no plot has been drawn on real
+hardware — the SVG is correct by inspection and renders faithfully, but your
+plotter is the final word.
 
 **Not verified from the build sandbox:** live calls to YouTube oEmbed, LRCLIB,
 and lyrics.ovh — outbound requests to those hosts are blocked here, so the
@@ -233,7 +285,9 @@ The paste path is fully exercised end to end.
 ```
 src/
   lyrics/     acquisition — youtube.ts, providers.ts, index.ts
+  audio/      fft.ts, features.ts, decode.ts, live.ts, types.ts
   analysis/   tokenize.ts, lexicons.ts, analyze.ts, interpret.ts
-  art/        rng.ts, color.ts, renderer.ts, systems/×7
+  art/        geometry.ts, catalog.ts, treatments.ts, painter.ts,
+              renderer.ts, svg.ts, color.ts, rng.ts, engines/×17
   ui/app.ts   controller
 ```

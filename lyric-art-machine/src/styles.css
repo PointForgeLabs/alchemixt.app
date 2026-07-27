@@ -724,3 +724,15 @@ button:disabled {
 .plot-flag.is-plottable {
   color: #7fb27a;
 }
+
+/* ---------- plotter bar ---------- */
+
+.plot-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
