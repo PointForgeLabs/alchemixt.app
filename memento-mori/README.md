@@ -107,9 +107,10 @@ node dev/shoot.mjs plate out/ '{"page":"a5"}'   # full plate, PNG + SVG
 node dev/sweep.mjs presets             # every style preset
 node dev/sweep.mjs layouts             # frames, vignettes, motifs
 node dev/sweep.mjs ui                  # the app shell
-node dev/targets.mjs                   # all 12 render-target configurations
+node dev/targets.mjs                   # all 18 render-target configurations
 node dev/tiling.mjs                    # tiled vs untiled, byte for byte
 node dev/contextloss.mjs               # driver-reset diagnosis and recovery
+node dev/regression.mjs                # allocations that stop working mid-render
 node dev/checks.mjs                    # 19 awkward parameter combinations
 node dev/bundle.mjs out.html           # single-file build for file://
 ```
@@ -172,7 +173,18 @@ So the renderer:
   target ~120 ms per draw;
 - checks `isContextLost()` before blaming the framebuffer configuration;
 - rebuilds itself once and retries when the context is lost, halving the tile
-  budget, rather than surfacing a dead renderer.
+  budget, rather than surfacing a dead renderer;
+- searches tile sizes with a descending ladder rather than a bisection, because
+  a bisection assumes one monotonic size threshold and can conclude nothing works
+  while never trying sizes that do;
+- grows the budget by at most 2× at a time, and falls back to the last tile size
+  that actually drew if a larger one is refused — allocations really do stop
+  succeeding part-way through a render, and growth must never break a render that
+  was already working.
+
+`dev/regression.mjs` reproduces that last signature directly: allocation that
+succeeds and is then refused, which is the failure mode a naive "find the limit
+once" search cannot survive.
 
 The stats panel shows the active configuration and tile size. If you see a driver
 reset repeatedly, lower **Render detail** or raise **Engraving pitch** — both cut

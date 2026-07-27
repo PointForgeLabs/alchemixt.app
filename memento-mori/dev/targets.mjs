@@ -39,7 +39,8 @@ const browser = await chromium.launch({
 
 const results = [];
 let failures = 0;
-for (const index of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]) {
+const COUNT = 18;   // 3 storage kinds x 2 formats x 3 attachment splits
+for (let index = 0; index < COUNT; index++) {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
 await page.route('**://fonts.googleapis.com/**', (r) => r.abort());
 await page.route('**://fonts.gstatic.com/**', (r) => r.abort());

@@ -144,7 +144,9 @@ const STORAGE_KINDS = [
 
 const TARGET_CONFIGS = [];
 for (const float of [true, false]) {
-  for (const { attachments, passes } of [{ attachments: 4, passes: 1 }, { attachments: 2, passes: 2 }]) {
+  for (const { attachments, passes } of [
+    { attachments: 4, passes: 1 }, { attachments: 2, passes: 2 }, { attachments: 1, passes: 4 },
+  ]) {
     for (const storage of STORAGE_KINDS) {
       TARGET_CONFIGS.push({
         float, attachments, passes, storage: storage.id,
@@ -204,7 +206,7 @@ export class SkullRenderer {
       ? forced : 0;
     this.configIndex = this.startIndex;
     this.config = null;
-    this.maxTileWidth = 0;
+    this.lastGoodTile = null;
     this.tileBudget = Math.max(4096, Number(opts.tileBudget) || DEFAULT_TILE_PIXELS);
     this.debugInfo = this._describeGpu();
 
@@ -334,6 +336,11 @@ export class SkullRenderer {
     // tiling path can be exercised on hardware that has no such limit.
     const cap = Number(globalThis.__MM_MAX_TILE_WIDTH);
     if (Number.isFinite(cap) && cap > 0 && w > cap) return -3;
+    // Test hook reproducing the nastiest reported signature: allocations that
+    // succeed at first and are refused later, so a size proven to work stops
+    // working mid-render.
+    const after = globalThis.__MM_CAP_AFTER;
+    if (after && (this._buildCount || 0) >= after.builds && w > after.width) return -3;
     const fmt = cfg.float ? gl.RGBA32F : gl.RGBA16F;
     const attachFns = [];
 
@@ -387,6 +394,7 @@ export class SkullRenderer {
       const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
       if (status !== gl.FRAMEBUFFER_COMPLETE) return status;
     }
+    this._buildCount = (this._buildCount || 0) + 1;
     return gl.FRAMEBUFFER_COMPLETE;
   }
 
@@ -450,52 +458,68 @@ export class SkullRenderer {
     this._releaseTargets();
 
     const rejected = [];
-    // A driver's width ceiling does not move, so once found it is reused rather
-    // than re-bisected every time the plate size changes.
-    let ceiling = Math.min(width, budgetW);
-    if (this.maxTileWidth && this.maxTileWidth < ceiling) ceiling = this.maxTileWidth;
-    if (this._allocateAny(ceiling, band, rejected) >= 0) {
-      this.tilePlan = {
-        key, tileW: ceiling, tileH: band,
-        tiled: ceiling < width, maxWidth: this.maxTileWidth,
-      };
-    } else {
-      // Largest width the driver will accept at this band height.
-      let lo = 8, hi = ceiling - 1, best = 0;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        if (this._allocateAny(mid, band, null) >= 0) {
-          best = mid;
-          this._releaseTargets();
-          lo = mid + 1;
-        } else {
-          hi = mid - 1;
-        }
-      }
-      if (!best) {
-        if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
-        const d = this.debugInfo;
-        throw new Error(
-          `No usable render-target configuration at ${width}×${band}, ` +
-          `and no narrower tile worked either.\n\n` +
-          `Tried: ${rejected.join('; ')}\n\n` +
-          `GPU: ${d.vendor} / ${d.renderer}\n` +
-          `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
-          `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
-          `float32 ${d.float32}, float16 ${d.float16}, blendable ${d.floatBlend}\n\n` +
-          `At 64×64: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}\n\n` +
-          `Please report this text — it identifies exactly what the driver refused.`
-        );
-      }
-      // Round down to a multiple of 8: bisection lands on arbitrary widths and a
-      // tidy stride keeps the tile count stable as the plate size changes.
-      const tileW = Math.max(8, best - (best % 8));
-      if (this._allocateAny(tileW, band, rejected) < 0) {
-        throw new Error(`Render target of ${tileW}×${band} became unavailable mid-probe.`);
-      }
-      this.maxTileWidth = tileW;
-      this.tilePlan = { key, tileW, tileH: band, tiled: true, maxWidth: best };
+    // Descending ladder rather than a bisection. A bisection assumes the driver
+    // has one monotonic size threshold; this one does not behave that way, and a
+    // bisection that guesses wrong on its first probe can conclude nothing works
+    // while sizes it never tried are fine. This tries every candidate, largest
+    // first, and stops at the first that is actually complete.
+    const widths = [];
+    const ceiling = Math.min(width, budgetW);
+    for (const w of [ceiling, 1024, 768, 512, 384, 256, 192, 128, 96, 64, 48, 32, 16, 8]) {
+      if (w <= ceiling && w >= 8 && !widths.includes(w)) widths.push(w);
     }
+    const heights = [];
+    for (const h of [band, 64, 32, 16, 8]) {
+      if (h <= band && h >= 8 && !heights.includes(h)) heights.push(h);
+    }
+    // A size that worked before is worth trying first: it is both likely to work
+    // again and cheaper than walking the ladder from the top.
+    const preferred = this.lastGoodTile;
+    if (preferred && preferred.w <= ceiling) {
+      widths.unshift(preferred.w);
+      if (!heights.includes(preferred.h)) heights.unshift(preferred.h);
+    }
+
+    let chosen = null;
+    outer:
+    for (const h of heights) {
+      for (const w of widths) {
+        if (this._allocateAny(w, h, chosen === null && h === heights[0] ? rejected : null) >= 0) {
+          chosen = { w, h };
+          break outer;
+        }
+        if (this.contextLost) break outer;
+      }
+    }
+
+    if (!chosen) {
+      if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
+      // Re-run the startup probe now. If 64x64 has stopped working too then the
+      // context or driver state is the problem, not the size; if it still works,
+      // the refusal really is size-dependent. Those need different fixes, and
+      // guessing between them has cost enough already.
+      const live = this._probeMatrix(64, 64);
+      const d = this.debugInfo;
+      throw new Error(
+        `No usable render-target configuration at ${width}×${band}, and none of ` +
+        `${widths.join('/')} wide by ${heights.join('/')} tall worked either.\n\n` +
+        `Tried at the largest size: ${rejected.join('; ')}\n\n` +
+        `GPU: ${d.vendor} / ${d.renderer}\n` +
+        `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
+        `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
+        `float32 ${d.float32}, float16 ${d.float16}, blendable ${d.floatBlend}\n` +
+        `contextLost ${this.gl.isContextLost()}, tileBudget ${this.tileBudget}, ` +
+        `lastGoodTile ${preferred ? `${preferred.w}x${preferred.h}` : 'none'}\n\n` +
+        `64×64 at startup: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}\n` +
+        `64×64 right now:  ${Object.entries(live).map(([k, v]) => `${k}:${v}`).join(' ')}\n\n` +
+        `Please report this text — the two 64×64 lines say whether the driver ` +
+        `changed its mind or the size is genuinely the issue.`
+      );
+    }
+
+    const { w: tileW, h: tileH } = chosen;
+    this.lastGoodTile = { w: tileW, h: tileH };
+    this.tilePlan = { key, tileW, tileH, tiled: tileW < width || tileH < band };
 
     this.canvas.width = Math.max(this.canvas.width, this.tilePlan.tileW);
     this.canvas.height = Math.max(this.canvas.height, this.tilePlan.tileH);
@@ -519,7 +543,17 @@ export class SkullRenderer {
     });
     const rot = buildRotation(params.yaw, params.pitch, params.roll);
 
-    const tile = this._prepare(width, height, bandRows);
+    let tile;
+    try {
+      tile = this._prepare(width, height, bandRows);
+    } catch (err) {
+      // Growing the budget must never be able to break a render that was already
+      // working. Fall back to the last size that drew, and stop growing.
+      if (!this.lastGoodTile || this.gl.isContextLost()) throw err;
+      this.tileBudget = Math.max(4096, this.lastGoodTile.w * this.lastGoodTile.h);
+      this._noGrow = true;
+      tile = this._prepare(width, height, bandRows);
+    }
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
@@ -632,8 +666,11 @@ export class SkullRenderer {
           const ms = performance.now() - tileStart;
           const px = tw * th * passes;
           const scaled = Math.round((px * TARGET_TILE_MS) / Math.max(ms, 0.5));
-          const next = Math.max(4096, Math.min(MAX_TILE_PIXELS, scaled));
-          if ((next < this.tileBudget * 0.6 || next > this.tileBudget * 1.8)
+          // Grow at most 2x at a time. A single jump straight to the ceiling is
+          // how a working small tile gets replaced by a size the driver refuses.
+          const next = Math.max(4096, Math.min(MAX_TILE_PIXELS, scaled, this.tileBudget * 2));
+          const mayGrow = !this._noGrow && next > this.tileBudget;
+          if ((next < this.tileBudget * 0.6 || (mayGrow && next > this.tileBudget * 1.8))
               && this._calibrations < 2) {
             this._calibrations++;
             this.tileBudget = next;
