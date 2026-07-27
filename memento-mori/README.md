@@ -107,6 +107,11 @@ node dev/shoot.mjs plate out/ '{"page":"a5"}'   # full plate, PNG + SVG
 node dev/sweep.mjs presets             # every style preset
 node dev/sweep.mjs layouts             # frames, vignettes, motifs
 node dev/sweep.mjs ui                  # the app shell
+node dev/targets.mjs                   # all 12 render-target configurations
+node dev/tiling.mjs                    # tiled vs untiled, byte for byte
+node dev/contextloss.mjs               # driver-reset diagnosis and recovery
+node dev/checks.mjs                    # 19 awkward parameter combinations
+node dev/bundle.mjs out.html           # single-file build for file://
 ```
 
 The probe sheet renders the raw G-buffer — luminance, normal, depth, region,
@@ -149,3 +154,30 @@ dev/                  headless render harnesses
 WebGL2 with `EXT_color_buffer_float` (or `EXT_color_buffer_half_float`). That
 covers current desktop and mobile browsers; the app reports a clear error rather
 than degrading if it is missing.
+
+### Driver watchdogs
+
+The raymarch is expensive per pixel, and an operating system will reset the GPU
+driver if a single draw call runs too long — about two seconds on Windows (TDR).
+That would be survivable except for one trap: **once the context is lost,
+`checkFramebufferStatus` returns `FRAMEBUFFER_UNSUPPORTED` for every check, at
+every size and every format.** A driver reset is therefore indistinguishable from
+an unsupported pixel format unless `isContextLost()` is consulted, and it will
+happily send you looking for a formats problem that does not exist.
+
+So the renderer:
+
+- caps the pixels in one draw (`DEFAULT_TILE_PIXELS`), tiling the raster in
+  columns as well as bands, and calibrates that budget from a measured tile to
+  target ~120 ms per draw;
+- checks `isContextLost()` before blaming the framebuffer configuration;
+- rebuilds itself once and retries when the context is lost, halving the tile
+  budget, rather than surfacing a dead renderer.
+
+The stats panel shows the active configuration and tile size. If you see a driver
+reset repeatedly, lower **Render detail** or raise **Engraving pitch** — both cut
+the per-plate pixel count.
+
+`dev/contextloss.mjs` forces a real context loss with `WEBGL_lose_context` and
+asserts both the diagnosis and the recovery, because this failure mode is
+otherwise impossible to test on hardware that never trips its watchdog.

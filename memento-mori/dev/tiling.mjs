@@ -49,6 +49,8 @@ let failures = 0;
 
 for (const cap of CAPS) {
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
+await page.route('**://fonts.googleapis.com/**', (r) => r.abort());
+await page.route('**://fonts.gstatic.com/**', (r) => r.abort());
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   await page.addInitScript((c) => { if (c) window.__MM_MAX_TILE_WIDTH = c; }, cap);

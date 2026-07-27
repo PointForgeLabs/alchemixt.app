@@ -70,6 +70,8 @@ const browser = await chromium.launch({
   args: ['--enable-unsafe-swiftshader', '--use-gl=angle', '--use-angle=swiftshader'],
 });
 const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
+await page.route('**://fonts.googleapis.com/**', (r) => r.abort());
+await page.route('**://fonts.gstatic.com/**', (r) => r.abort());
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(`http://127.0.0.1:${port}/memento-mori/`);

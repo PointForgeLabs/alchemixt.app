@@ -1,6 +1,14 @@
-// WebGL2 host for the raymarch pass. Renders the skull into four float render
-// targets in horizontal bands (yielding to the browser between them so a slow
-// GPU cannot trip the watchdog) and hands the CPU a set of Float32 fields.
+// WebGL2 host for the raymarch pass. Renders the skull into float render targets
+// and hands the CPU a set of Float32 fields.
+//
+// Almost everything below the drawing itself exists because GPU drivers disagree
+// about what they will accept. The render-target format, the number of
+// attachments, how their storage is allocated, and how many pixels may be drawn
+// in one call are all negotiated at runtime rather than assumed -- see
+// TARGET_CONFIGS and DEFAULT_TILE_PIXELS. The single nastiest trap is that a lost
+// context reports FRAMEBUFFER_UNSUPPORTED for every framebuffer check, which is
+// indistinguishable from an unsupported pixel format unless isContextLost() is
+// consulted first.
 
 import { VERT_SRC, buildFragSrc } from './shaders.js';
 
@@ -103,6 +111,31 @@ const UNIFORM_NAMES = [
  *  attachments Four at once, or two with the shader run twice (outputs 0-1 then
  *              2-3). Halves the attachment pressure; costs a second march.
  */
+/**
+ * Pixels allowed in a single draw call.
+ *
+ * This is the defence against a driver watchdog reset. Windows gives a draw call
+ * about two seconds before it resets the GPU (TDR); a lost context then reports
+ * FRAMEBUFFER_UNSUPPORTED for every framebuffer check at every size, which looks
+ * exactly like an unsupported format and is why this took so long to find. One
+ * full-width band of a large plate is ~90k pixels of extremely heavy raymarching
+ * -- comfortably over budget on integrated graphics. The renderer starts
+ * conservatively and calibrates upward from a measured tile.
+ */
+const DEFAULT_TILE_PIXELS = 8192;       // e.g. 128 x 64 -- deliberately timid
+const MAX_TILE_PIXELS = 262144;
+const TARGET_TILE_MS = 120;             // well inside any watchdog budget
+
+function contextLostError() {
+  return new Error(
+    'The GPU driver reset and the WebGL context was lost.\n\n' +
+    'This usually means a single draw call ran long enough for the operating ' +
+    'system to restart the graphics driver. The renderer has reduced its tile ' +
+    'size; press Render again and it will retry with smaller draws.\n\n' +
+    'If it keeps happening, lower "Render detail" or raise "Engraving pitch".'
+  );
+}
+
 const STORAGE_KINDS = [
   { id: 'RB', label: 'renderbuffer' },
   { id: 'TS', label: 'texStorage' },
@@ -124,7 +157,7 @@ for (const float of [true, false]) {
 }
 
 export class SkullRenderer {
-  constructor() {
+  constructor(opts = {}) {
     this.canvas = document.createElement('canvas');
     this.canvas.width = 8;
     this.canvas.height = 8;
@@ -134,6 +167,15 @@ export class SkullRenderer {
     });
     if (!gl) throw new Error('WebGL2 is required. Try a current desktop browser.');
     this.gl = gl;
+
+    // A driver reset (Windows TDR, typically) loses the context. Calling
+    // preventDefault lets the browser restore it, but every GL object is gone,
+    // so the app discards this renderer and builds a fresh one.
+    this.contextLost = false;
+    this.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+    }, false);
 
     this.floatExt = gl.getExtension('EXT_color_buffer_float');
     this.halfExt = gl.getExtension('EXT_color_buffer_half_float');
@@ -163,6 +205,7 @@ export class SkullRenderer {
     this.configIndex = this.startIndex;
     this.config = null;
     this.maxTileWidth = 0;
+    this.tileBudget = Math.max(4096, Number(opts.tileBudget) || DEFAULT_TILE_PIXELS);
     this.debugInfo = this._describeGpu();
 
     this.program = this._buildProgram();
@@ -283,6 +326,10 @@ export class SkullRenderer {
    */
   _tryBuild(cfg, w, h) {
     const gl = this.gl;
+    // A lost context reports FRAMEBUFFER_UNSUPPORTED for every check, at every
+    // size and format. Catch it here or it masquerades as an unsupported
+    // configuration and sends the search off in entirely the wrong direction.
+    if (gl.isContextLost()) return -4;
     // Test hook: pretend the driver refuses anything wider than this, so the
     // tiling path can be exercised on hardware that has no such limit.
     const cap = Number(globalThis.__MM_MAX_TILE_WIDTH);
@@ -369,6 +416,7 @@ export class SkullRenderer {
         this.tileH = h;
         return i;
       }
+      if (status === -4) { this.contextLost = true; return -4; }
       if (rejected) {
         if (status === -3) rejected.push(`${cfg.short}: width capped (test hook)`);
         else if (status === -2) rejected.push(`${cfg.short}: storage refused`);
@@ -390,15 +438,22 @@ export class SkullRenderer {
    * already takes a tile origin, so tiling costs draw calls and nothing else.
    */
   _prepare(width, height, bandRows) {
+    if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
     const band = Math.max(8, Math.min(bandRows, height));
-    const key = `${width}x${band}`;
+    // Cap the pixels in a single draw. This is the real defence against a driver
+    // watchdog reset: one band of a large plate is ~90k pixels of very heavy
+    // raymarching, which on integrated graphics can exceed the two-second budget
+    // Windows allows a draw call before it resets the GPU.
+    const budgetW = Math.max(8, Math.min(width, Math.floor(this.tileBudget / band)));
+    const key = `${width}x${band}x${budgetW}`;
     if (this.tilePlan && this.tilePlan.key === key && this.fbos.length) return this.tilePlan;
     this._releaseTargets();
 
     const rejected = [];
     // A driver's width ceiling does not move, so once found it is reused rather
     // than re-bisected every time the plate size changes.
-    const ceiling = this.maxTileWidth && this.maxTileWidth < width ? this.maxTileWidth : width;
+    let ceiling = Math.min(width, budgetW);
+    if (this.maxTileWidth && this.maxTileWidth < ceiling) ceiling = this.maxTileWidth;
     if (this._allocateAny(ceiling, band, rejected) >= 0) {
       this.tilePlan = {
         key, tileW: ceiling, tileH: band,
@@ -418,6 +473,7 @@ export class SkullRenderer {
         }
       }
       if (!best) {
+        if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
         const d = this.debugInfo;
         throw new Error(
           `No usable render-target configuration at ${width}×${band}, ` +
@@ -542,6 +598,8 @@ export class SkullRenderer {
     let lastYield = performance.now();
 
     const { attachments, passes } = this.config;
+    let calibrated = false;
+    this._calibrations = (this._calibrations || 0);
     for (let ry = 0; ry < rows; ry++) {
       const y0 = ry * tile.tileH;           // GL rows, measured from the bottom
       const th = Math.min(tile.tileH, height - y0);
@@ -549,6 +607,7 @@ export class SkullRenderer {
         const x0 = rx * tile.tileW;
         const tw = Math.min(tile.tileW, width - x0);
         gl.uniform2f(u.uTileOrigin, x0, y0);
+        const tileStart = performance.now();
 
         // In two-attachment mode the scene is marched once per pass, each pass
         // keeping a different half of the shader's outputs.
@@ -563,6 +622,22 @@ export class SkullRenderer {
             gl.readBuffer(gl.COLOR_ATTACHMENT0 + slot);
             gl.readPixels(0, 0, tw, th, gl.RGBA, gl.FLOAT, scratch);
             this._scatter(fields, scratch, width, height, x0, y0, tw, th, slot);
+          }
+        }
+        // Calibrate off the first tile: if the GPU is far quicker or slower than
+        // assumed, resize the tile for the rest of the plate rather than
+        // discovering it via a driver reset.
+        if (!calibrated) {
+          calibrated = true;
+          const ms = performance.now() - tileStart;
+          const px = tw * th * passes;
+          const scaled = Math.round((px * TARGET_TILE_MS) / Math.max(ms, 0.5));
+          const next = Math.max(4096, Math.min(MAX_TILE_PIXELS, scaled));
+          if ((next < this.tileBudget * 0.6 || next > this.tileBudget * 1.8)
+              && this._calibrations < 2) {
+            this._calibrations++;
+            this.tileBudget = next;
+            return this.render({ width, height, params, bandRows, onProgress });
           }
         }
         done++;
@@ -580,6 +655,11 @@ export class SkullRenderer {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindVertexArray(null);
+    if (gl.isContextLost()) {
+      this.contextLost = true;
+      this.tileBudget = Math.max(4096, Math.floor(this.tileBudget / 3));
+      throw contextLostError();
+    }
     return fields;
   }
 

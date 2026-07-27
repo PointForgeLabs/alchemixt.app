@@ -81,13 +81,28 @@ async function _renderPlate({ quick = false } = {}) {
       params.stippleWeight = Math.min(params.stippleWeight, 0.4);
     }
 
-    const drawing = await composePlate({
-      renderer,
-      params,
-      onStage: (label, frac) => {
-        if (token === renderToken) setStatus(label + '…', frac);
-      },
-    });
+    let drawing;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        drawing = await composePlate({
+          renderer,
+          params,
+          onStage: (label, frac) => {
+            if (token === renderToken) setStatus(label + '…', frac);
+          },
+        });
+        break;
+      } catch (err) {
+        // A driver reset destroys every GL object, so the renderer cannot be
+        // reused -- but the tile size it settled on can, and it is now smaller.
+        // Rebuild once and retry before troubling the user.
+        if (!renderer.contextLost || attempt >= 1) throw err;
+        setStatus('GPU driver reset — retrying with smaller tiles…', 0);
+        const budget = Math.max(4096, Math.floor(renderer.tileBudget));
+        try { renderer.dispose(); } catch { /* the context is already gone */ }
+        renderer = new SkullRenderer({ tileBudget: budget });
+      }
+    }
     if (token !== renderToken) return;
 
     drawing.stamp = token;
@@ -290,6 +305,9 @@ async function boot() {
     plan: () => planPlate(state),
     targetConfig: () => (current && current.drawing.fields.targetConfig)
       || (renderer.config ? renderer.config.id : 'none'),
+    glContext: () => renderer.gl,
+    probeTargets: (w, h) => renderer._prepare(w, h * 4, h),
+    tileBudget: () => renderer.tileBudget,
     gpu: () => ({ ...renderer.debugInfo, probeResult: renderer.probe, configs: renderer.configs.map((c) => c.short) }),
     bounds: () => {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;

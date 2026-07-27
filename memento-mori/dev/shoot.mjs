@@ -66,6 +66,8 @@ const browser = await chromium.launch({
   ],
 });
 const page = await browser.newPage({ viewport: { width: 1700, height: 1200 } });
+await page.route('**://fonts.googleapis.com/**', (r) => r.abort());
+await page.route('**://fonts.gstatic.com/**', (r) => r.abort());
 page.on('console', (m) => {
   if (m.type() === 'error' || m.type() === 'warning' || /\[dev\]/.test(m.text())) {
     console.log(`  [page:${m.type()}] ${m.text()}`);
