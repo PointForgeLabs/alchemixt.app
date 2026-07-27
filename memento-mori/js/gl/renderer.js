@@ -162,6 +162,7 @@ export class SkullRenderer {
       ? forced : 0;
     this.configIndex = this.startIndex;
     this.config = null;
+    this.maxTileWidth = 0;
     this.debugInfo = this._describeGpu();
 
     this.program = this._buildProgram();
@@ -208,6 +209,7 @@ export class SkullRenderer {
       }
       while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
       out[cfg.short] = status === gl.FRAMEBUFFER_COMPLETE ? 'ok'
+        : status === -3 ? 'capped'
         : status === -2 ? 'storage'
         : status === -1 ? 'threw'
         : `0x${status.toString(16)}`;
@@ -270,6 +272,7 @@ export class SkullRenderer {
     this.textures = [];
     this.renderbuffers = [];
     this.drawLists = [];
+    this.tilePlan = null;
     this.tileW = 0;
     this.tileH = 0;
   }
@@ -280,6 +283,10 @@ export class SkullRenderer {
    */
   _tryBuild(cfg, w, h) {
     const gl = this.gl;
+    // Test hook: pretend the driver refuses anything wider than this, so the
+    // tiling path can be exercised on hardware that has no such limit.
+    const cap = Number(globalThis.__MM_MAX_TILE_WIDTH);
+    if (Number.isFinite(cap) && cap > 0 && w > cap) return -3;
     const fmt = cfg.float ? gl.RGBA32F : gl.RGBA16F;
     const attachFns = [];
 
@@ -337,53 +344,106 @@ export class SkullRenderer {
   }
 
   /**
-   * Walk the ladder until something is complete at this size. Refused
-   * configurations are never retried, so the cost is paid once.
+   * Walk the configuration ladder at one tile size. Leaves the winner allocated
+   * and returns its index, or -1 with nothing allocated.
    */
-  _ensureTargets(w, h) {
-    if (this.tileW === w && this.tileH === h && this.fbos && this.fbos.length) return;
+  _allocateAny(w, h, rejected) {
     const gl = this.gl;
-    this._releaseTargets();
-
-    const rejected = [];
-    for (let i = this.configIndex; i < this.configs.length; i++) {
+    for (let i = this.startIndex; i < this.configs.length; i++) {
       const cfg = this.configs[i];
       let status;
       try {
         status = this._tryBuild(cfg, w, h);
       } catch (err) {
         status = -1;
-        rejected.push(`${cfg.short}: threw ${err.message}`);
+        if (rejected) rejected.push(`${cfg.short}: threw ${err.message}`);
       }
       // A rejected configuration leaves the error flag set; drain it so the next
       // attempt is not diagnosed with a stale error.
       while (gl.getError() !== gl.NO_ERROR) { /* drain */ }
 
       if (status === gl.FRAMEBUFFER_COMPLETE) {
-        this.configIndex = i;
         this.config = cfg;
-        this.canvas.width = Math.max(this.canvas.width, w);
-        this.canvas.height = Math.max(this.canvas.height, h);
+        this.configIndex = i;
         this.tileW = w;
         this.tileH = h;
-        return;
+        return i;
       }
-      if (status === -2) rejected.push(`${cfg.short}: storage refused`);
-      else if (status >= 0) rejected.push(`${cfg.short}: 0x${status.toString(16)}`);
+      if (rejected) {
+        if (status === -3) rejected.push(`${cfg.short}: width capped (test hook)`);
+        else if (status === -2) rejected.push(`${cfg.short}: storage refused`);
+        else if (status >= 0) rejected.push(`${cfg.short}: 0x${status.toString(16)}`);
+      }
       this._releaseTargets();
     }
+    return -1;
+  }
 
-    const d = this.debugInfo;
-    throw new Error(
-      `No usable render-target configuration at ${w}×${h}.\n\n` +
-      `Tried: ${rejected.join('; ')}\n\n` +
-      `GPU: ${d.vendor} / ${d.renderer}\n` +
-      `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
-      `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
-      `float32 ${d.float32}, float16 ${d.float16}, blendable ${d.floatBlend}\n\n` +
-      `At 64×64: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}\n\n` +
-      `Please report this text — it identifies exactly what the driver refused.`
-    );
+  /**
+   * Decide the tile size to render in, and leave targets allocated for it.
+   *
+   * The full raster width is tried first. If the driver refuses it -- and some do,
+   * well below any limit they advertise: Intel Iris Xe via ANGLE/D3D11 rejects a
+   * 1365-wide multi-target float framebuffer while accepting 64 wide, with
+   * MAX_RENDERBUFFER_SIZE reporting 16384 -- the largest acceptable width is found
+   * by bisection and the image is rendered in columns as well as bands. The shader
+   * already takes a tile origin, so tiling costs draw calls and nothing else.
+   */
+  _prepare(width, height, bandRows) {
+    const band = Math.max(8, Math.min(bandRows, height));
+    const key = `${width}x${band}`;
+    if (this.tilePlan && this.tilePlan.key === key && this.fbos.length) return this.tilePlan;
+    this._releaseTargets();
+
+    const rejected = [];
+    // A driver's width ceiling does not move, so once found it is reused rather
+    // than re-bisected every time the plate size changes.
+    const ceiling = this.maxTileWidth && this.maxTileWidth < width ? this.maxTileWidth : width;
+    if (this._allocateAny(ceiling, band, rejected) >= 0) {
+      this.tilePlan = {
+        key, tileW: ceiling, tileH: band,
+        tiled: ceiling < width, maxWidth: this.maxTileWidth,
+      };
+    } else {
+      // Largest width the driver will accept at this band height.
+      let lo = 8, hi = ceiling - 1, best = 0;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (this._allocateAny(mid, band, null) >= 0) {
+          best = mid;
+          this._releaseTargets();
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+      if (!best) {
+        const d = this.debugInfo;
+        throw new Error(
+          `No usable render-target configuration at ${width}×${band}, ` +
+          `and no narrower tile worked either.\n\n` +
+          `Tried: ${rejected.join('; ')}\n\n` +
+          `GPU: ${d.vendor} / ${d.renderer}\n` +
+          `Limits: draw buffers ${d.maxDrawBuffers}, colour attachments ${d.maxColorAttachments}, ` +
+          `max texture ${d.maxTextureSize}, max renderbuffer ${d.maxRenderbufferSize}, ` +
+          `float32 ${d.float32}, float16 ${d.float16}, blendable ${d.floatBlend}\n\n` +
+          `At 64×64: ${Object.entries(this.probe).map(([k, v]) => `${k}:${v}`).join(' ')}\n\n` +
+          `Please report this text — it identifies exactly what the driver refused.`
+        );
+      }
+      // Round down to a multiple of 8: bisection lands on arbitrary widths and a
+      // tidy stride keeps the tile count stable as the plate size changes.
+      const tileW = Math.max(8, best - (best % 8));
+      if (this._allocateAny(tileW, band, rejected) < 0) {
+        throw new Error(`Render target of ${tileW}×${band} became unavailable mid-probe.`);
+      }
+      this.maxTileWidth = tileW;
+      this.tilePlan = { key, tileW, tileH: band, tiled: true, maxWidth: best };
+    }
+
+    this.canvas.width = Math.max(this.canvas.width, this.tilePlan.tileW);
+    this.canvas.height = Math.max(this.canvas.height, this.tilePlan.tileH);
+    return this.tilePlan;
   }
 
   /**
@@ -403,21 +463,7 @@ export class SkullRenderer {
     });
     const rot = buildRotation(params.yaw, params.pitch, params.roll);
 
-    // Some refusals are size-dependent rather than format-dependent, so if the
-    // whole ladder fails at this band height, halve it and let every
-    // configuration try again. Narrower bands mean more draw calls, not a worse
-    // picture.
-    let band = Math.max(8, Math.min(bandRows, height));
-    for (;;) {
-      try {
-        this._ensureTargets(width, band);
-        break;
-      } catch (err) {
-        if (band <= 8) throw err;
-        band = Math.max(8, band >> 1);
-        this.configIndex = this.startIndex;
-      }
-    }
+    const tile = this._prepare(width, height, bandRows);
 
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
@@ -476,7 +522,8 @@ export class SkullRenderer {
     const n = width * height;
     const fields = {
       width, height, cam, rot,
-      targetConfig: this.config.id,
+      targetConfig: this.config.id +
+        (tile.tiled ? ` · ${tile.tileW}×${tile.tileH} tiles` : ''),
       depth: new Float32Array(n),
       nx: new Float32Array(n), ny: new Float32Array(n), nz: new Float32Array(n),
       lum: new Float32Array(n), ao: new Float32Array(n),
@@ -487,33 +534,48 @@ export class SkullRenderer {
       mottle: new Float32Array(n),
     };
 
-    const scratch = new Float32Array(width * band * 4);
-    const bands = Math.ceil(height / band);
+    const scratch = new Float32Array(tile.tileW * tile.tileH * 4);
+    const cols = Math.ceil(width / tile.tileW);
+    const rows = Math.ceil(height / tile.tileH);
+    const total = cols * rows;
+    let done = 0;
+    let lastYield = performance.now();
 
     const { attachments, passes } = this.config;
-    for (let bi = 0; bi < bands; bi++) {
-      const y0 = bi * band;                 // GL rows, measured from the bottom
-      const rows = Math.min(band, height - y0);
-      gl.uniform2f(u.uTileOrigin, 0, y0);
+    for (let ry = 0; ry < rows; ry++) {
+      const y0 = ry * tile.tileH;           // GL rows, measured from the bottom
+      const th = Math.min(tile.tileH, height - y0);
+      for (let rx = 0; rx < cols; rx++) {
+        const x0 = rx * tile.tileW;
+        const tw = Math.min(tile.tileW, width - x0);
+        gl.uniform2f(u.uTileOrigin, x0, y0);
 
-      // In two-attachment mode the scene is marched once per pass, each pass
-      // keeping a different half of the shader's outputs.
-      for (let pass = 0; pass < passes; pass++) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos[pass]);
-        gl.drawBuffers(this.drawLists[pass]);
-        gl.viewport(0, 0, width, rows);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        // In two-attachment mode the scene is marched once per pass, each pass
+        // keeping a different half of the shader's outputs.
+        for (let pass = 0; pass < passes; pass++) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbos[pass]);
+          gl.drawBuffers(this.drawLists[pass]);
+          gl.viewport(0, 0, tw, th);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-        for (let k = 0; k < attachments; k++) {
-          const slot = pass * attachments + k;
-          gl.readBuffer(gl.COLOR_ATTACHMENT0 + slot);
-          gl.readPixels(0, 0, width, rows, gl.RGBA, gl.FLOAT, scratch);
-          this._scatter(fields, scratch, width, height, y0, rows, slot);
+          for (let k = 0; k < attachments; k++) {
+            const slot = pass * attachments + k;
+            gl.readBuffer(gl.COLOR_ATTACHMENT0 + slot);
+            gl.readPixels(0, 0, tw, th, gl.RGBA, gl.FLOAT, scratch);
+            this._scatter(fields, scratch, width, height, x0, y0, tw, th, slot);
+          }
+        }
+        done++;
+        if (onProgress) onProgress(done / total);
+        // Yield so the page stays responsive and the driver can breathe -- but
+        // on time, not per tile. A width-limited driver can turn one plate into
+        // several hundred tiles, and a frame each would cost seconds of pure
+        // waiting.
+        if (performance.now() - lastYield > 24) {
+          await new Promise((r) => requestAnimationFrame(r));
+          lastYield = performance.now();
         }
       }
-      if (onProgress) onProgress((bi + 1) / bands);
-      // Yield so the page stays responsive and the driver can breathe.
-      await new Promise((r) => requestAnimationFrame(r));
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -521,36 +583,40 @@ export class SkullRenderer {
     return fields;
   }
 
-  /** Copy one band of one attachment into the CPU fields, flipping to y-down. */
-  _scatter(f, buf, width, height, glY0, rows, attachment) {
-    for (let j = 0; j < rows; j++) {
+  /**
+   * Copy one tile of one attachment into the CPU fields, flipping to y-down.
+   * The readback is packed at the tile's width, not the image's, so the source
+   * stride is `tw` while the destination stride stays `width`.
+   */
+  _scatter(f, buf, width, height, glX0, glY0, tw, th, attachment) {
+    for (let j = 0; j < th; j++) {
       const dstRow = height - 1 - (glY0 + j);
       if (dstRow < 0) continue;
-      let si = j * width * 4;
-      let di = dstRow * width;
+      let si = j * tw * 4;
+      let di = dstRow * width + glX0;
       if (attachment === 0) {
-        for (let x = 0; x < width; x++, si += 4, di++) {
+        for (let x = 0; x < tw; x++, si += 4, di++) {
           f.depth[di] = buf[si];
           f.nx[di] = buf[si + 1];
           f.ny[di] = buf[si + 2];
           f.nz[di] = buf[si + 3];
         }
       } else if (attachment === 1) {
-        for (let x = 0; x < width; x++, si += 4, di++) {
+        for (let x = 0; x < tw; x++, si += 4, di++) {
           f.lum[di] = buf[si];
           f.ao[di] = buf[si + 1];
           f.formU[di] = buf[si + 2];
           f.formV[di] = buf[si + 3];
         }
       } else if (attachment === 2) {
-        for (let x = 0; x < width; x++, si += 4, di++) {
+        for (let x = 0; x < tw; x++, si += 4, di++) {
           f.region[di] = buf[si];
           f.curv[di] = buf[si + 1];
           f.ndotv[di] = buf[si + 2];
           f.mask[di] = buf[si + 3] > 0.5 ? 1 : 0;
         }
       } else {
-        for (let x = 0; x < width; x++, si += 4, di++) {
+        for (let x = 0; x < tw; x++, si += 4, di++) {
           f.px[di] = buf[si];
           f.py[di] = buf[si + 1];
           f.pz[di] = buf[si + 2];

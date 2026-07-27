@@ -288,7 +288,8 @@ async function boot() {
     exportSvg: () => exportSvgText(),
     exportGcode: () => toGcode(current.drawing, current.layers),
     plan: () => planPlate(state),
-    targetConfig: () => (renderer.config ? renderer.config.id : 'none'),
+    targetConfig: () => (current && current.drawing.fields.targetConfig)
+      || (renderer.config ? renderer.config.id : 'none'),
     gpu: () => ({ ...renderer.debugInfo, probeResult: renderer.probe, configs: renderer.configs.map((c) => c.short) }),
     bounds: () => {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, count = 0;
