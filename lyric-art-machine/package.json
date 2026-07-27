@@ -1,0 +1,17 @@
+{
+  "name": "lyric-art-machine",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "An interpretive art machine: link a song, and it reads the lyrics and paints what it finds.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10"
+  }
+}

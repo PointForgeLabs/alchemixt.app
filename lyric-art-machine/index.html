@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Interpretive Art Machine</title>
+    <meta
+      name="description"
+      content="Link a song. The machine reads its lyrics and themes, then paints what it finds."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="masthead">
+        <div class="wordmark">
+          <span class="wordmark-glyph" aria-hidden="true"></span>
+          <div>
+            <h1>Interpretive Art Machine</h1>
+            <p class="tagline">Link a song. It reads the words, then paints what it found.</p>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <!-- ============ LEFT: input + reading ============ -->
+        <section class="console" aria-label="Controls and interpretation">
+          <form class="intake" id="intake-form" autocomplete="off">
+            <label class="field-label" for="url-input">YouTube link</label>
+            <div class="intake-row">
+              <input
+                id="url-input"
+                name="url"
+                type="text"
+                inputmode="url"
+                placeholder="https://www.youtube.com/watch?v=…"
+                spellcheck="false"
+              />
+              <button type="submit" class="primary" id="interpret-button">Interpret</button>
+            </div>
+            <p class="status" id="status" role="status" aria-live="polite"></p>
+          </form>
+
+          <!-- Revealed when auto-fetch can't find the words -->
+          <details class="fallback" id="fallback">
+            <summary>Paste lyrics instead</summary>
+            <p class="fallback-note">
+              The machine reads the words in memory to measure them. It never displays them back or
+              includes them in the artwork — only the interpretation it derives.
+            </p>
+            <textarea
+              id="lyrics-input"
+              rows="8"
+              placeholder="Paste the lyrics here…"
+              spellcheck="false"
+            ></textarea>
+            <button type="button" class="secondary" id="read-pasted">Read these words</button>
+          </details>
+
+          <!-- The machine's written interpretation -->
+          <article class="reading" id="reading" hidden>
+            <div class="now-reading" id="now-reading"></div>
+
+            <h2 class="verdict" id="verdict"></h2>
+
+            <div class="system-card">
+              <span class="system-eyebrow">Visual system</span>
+              <strong class="system-name" id="system-name"></strong>
+              <p class="system-description" id="system-description"></p>
+            </div>
+
+            <section class="reading-block">
+              <h3>Why it looks like this</h3>
+              <ul class="notes" id="notes"></ul>
+            </section>
+
+            <section class="reading-block">
+              <h3>Thematic fields</h3>
+              <ul class="themes" id="themes"></ul>
+            </section>
+
+            <section class="reading-block">
+              <h3>Measurements</h3>
+              <dl class="metrics" id="metrics"></dl>
+            </section>
+
+            <section class="reading-block">
+              <h3>Signature words</h3>
+              <ul class="signature" id="signature"></ul>
+            </section>
+          </article>
+        </section>
+
+        <!-- ============ RIGHT: the canvas ============ -->
+        <section class="gallery" aria-label="Generated artwork">
+          <div class="frame" id="frame">
+            <canvas id="canvas" width="1400" height="1750" role="img" aria-label="Generated interpretive artwork"></canvas>
+            <div class="frame-empty" id="frame-empty">
+              <p>Nothing read yet.</p>
+              <p class="frame-empty-sub">Paste a song link and the canvas will fill.</p>
+            </div>
+            <div class="progress" id="progress" hidden><span id="progress-bar"></span></div>
+          </div>
+
+          <div class="gallery-controls">
+            <button type="button" class="secondary" id="revariate" disabled>New variation</button>
+            <label class="select-field">
+              <span>Format</span>
+              <select id="format">
+                <option value="portrait">Portrait · 4:5</option>
+                <option value="square">Square · 1:1</option>
+                <option value="landscape">Landscape · 3:2</option>
+                <option value="poster">Poster · 2:3</option>
+              </select>
+            </label>
+            <button type="button" class="secondary" id="download" disabled>Download PNG</button>
+          </div>
+          <p class="plate" id="plate"></p>
+        </section>
+      </main>
+
+      <footer class="colophon">
+        <p>
+          Every mark is generated from the text — same song, same artwork, every time. Lyrics are
+          fetched from public databases, held in memory for analysis only, and never stored or
+          reproduced.
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
