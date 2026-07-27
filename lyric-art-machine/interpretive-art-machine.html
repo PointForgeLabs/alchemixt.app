@@ -2316,29 +2316,29 @@ button:disabled {
   // src/art/catalog.ts
   var STYLES = [
     // ---- current -------------------------------------------------------------
-    { key: "riverrun", name: "Riverrun", engine: "current", treatment: "ink", themes: ["water", "motion"], energy: 0.5, grit: 0.3 },
-    { key: "undertow", name: "Undertow", engine: "current", treatment: "wash", themes: ["water", "loss"], energy: 0.3, grit: 0.2, bias: { density: 0.8 } },
-    { key: "slipstream", name: "Slipstream", engine: "current", treatment: "neon", themes: ["motion", "city"], energy: 0.8, grit: 0.5 },
-    { key: "silt", name: "Silt", engine: "current", treatment: "engrave", themes: ["water", "memory"], energy: 0.35, grit: 0.4 },
-    { key: "crosswind", name: "Crosswind", engine: "current", treatment: "sketch", themes: ["motion", "nature"], energy: 0.55, grit: 0.5 },
-    { key: "tidewrack", name: "Tidewrack", engine: "current", treatment: "riso", themes: ["water", "motion"], energy: 0.6, grit: 0.55 },
+    { key: "riverrun", name: "Riverrun", engine: "current", treatment: "ink", themes: ["water", "motion"], energy: 0.5, grit: 0.3, preference: 0.45 },
+    { key: "undertow", name: "Undertow", engine: "current", treatment: "wash", themes: ["water", "loss"], energy: 0.3, grit: 0.2, bias: { density: 0.8 }, preference: 0.45 },
+    { key: "slipstream", name: "Slipstream", engine: "current", treatment: "neon", themes: ["motion", "city"], energy: 0.8, grit: 0.5, preference: 0.45 },
+    { key: "silt", name: "Silt", engine: "current", treatment: "engrave", themes: ["water", "memory"], energy: 0.35, grit: 0.4, preference: 0.45 },
+    { key: "crosswind", name: "Crosswind", engine: "current", treatment: "sketch", themes: ["motion", "nature"], energy: 0.55, grit: 0.5, preference: 0.45 },
+    { key: "tidewrack", name: "Tidewrack", engine: "current", treatment: "riso", themes: ["water", "motion"], energy: 0.6, grit: 0.55, preference: 0.45 },
     // ---- terrain -------------------------------------------------------------
-    { key: "contour", name: "Contour", engine: "terrain", treatment: "ink", themes: ["nature", "memory"], energy: 0.35, grit: 0.25 },
-    { key: "survey", name: "Survey", engine: "terrain", treatment: "blueprint", themes: ["nature", "city"], energy: 0.4, grit: 0.3 },
-    { key: "seabed", name: "Seabed", engine: "terrain", treatment: "engrave", themes: ["water", "memory"], energy: 0.3, grit: 0.35 },
-    { key: "ridgeline", name: "Ridgeline", engine: "terrain", treatment: "woodcut", themes: ["nature", "defiance"], energy: 0.6, grit: 0.7 },
-    { key: "lowland", name: "Lowland", engine: "terrain", treatment: "wash", themes: ["nature", "loss"], energy: 0.25, grit: 0.2 },
+    { key: "contour", name: "Contour", engine: "terrain", treatment: "ink", themes: ["nature", "memory"], energy: 0.35, grit: 0.25, preference: 0.6 },
+    { key: "survey", name: "Survey", engine: "terrain", treatment: "blueprint", themes: ["nature", "city"], energy: 0.4, grit: 0.3, preference: 0.6 },
+    { key: "seabed", name: "Seabed", engine: "terrain", treatment: "engrave", themes: ["water", "memory"], energy: 0.3, grit: 0.35, preference: 0.6 },
+    { key: "ridgeline", name: "Ridgeline", engine: "terrain", treatment: "woodcut", themes: ["nature", "defiance"], energy: 0.6, grit: 0.7, preference: 0.6 },
+    { key: "lowland", name: "Lowland", engine: "terrain", treatment: "wash", themes: ["nature", "loss"], energy: 0.25, grit: 0.2, preference: 0.6 },
     // ---- swarm ---------------------------------------------------------------
-    { key: "murmuration", name: "Murmuration", engine: "swarm", treatment: "ink", themes: ["nature", "motion"], energy: 0.55, grit: 0.35 },
-    { key: "hivemind", name: "Hivemind", engine: "swarm", treatment: "stipple", themes: ["city", "body"], energy: 0.5, grit: 0.45 },
-    { key: "panic", name: "Panic", engine: "swarm", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.85, grit: 0.7, bias: { turbulence: 1.3 } },
-    { key: "shoal", name: "Shoal", engine: "swarm", treatment: "riso", themes: ["water", "nature"], energy: 0.45, grit: 0.4 },
+    { key: "murmuration", name: "Murmuration", engine: "swarm", treatment: "ink", themes: ["nature", "motion"], energy: 0.55, grit: 0.35, preference: 0.55 },
+    { key: "hivemind", name: "Hivemind", engine: "swarm", treatment: "stipple", themes: ["city", "body"], energy: 0.5, grit: 0.45, preference: 0.55 },
+    { key: "panic", name: "Panic", engine: "swarm", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.85, grit: 0.7, bias: { turbulence: 1.3 }, preference: 0.55 },
+    { key: "shoal", name: "Shoal", engine: "swarm", treatment: "riso", themes: ["water", "nature"], energy: 0.45, grit: 0.4, preference: 0.55 },
     // ---- columns -------------------------------------------------------------
-    { key: "downpour", name: "Downpour", engine: "columns", treatment: "ink", themes: ["water", "loss"], energy: 0.5, grit: 0.35 },
-    { key: "curtainfall", name: "Curtainfall", engine: "columns", treatment: "wash", themes: ["loss", "night"], energy: 0.3, grit: 0.2 },
-    { key: "ticker", name: "Ticker", engine: "columns", treatment: "neon", themes: ["city", "motion"], energy: 0.75, grit: 0.5 },
-    { key: "reeds", name: "Reeds", engine: "columns", treatment: "engrave", themes: ["nature", "water"], energy: 0.3, grit: 0.3 },
-    { key: "staticfall", name: "Static Fall", engine: "columns", treatment: "halftone", themes: ["city", "night"], energy: 0.65, grit: 0.75 },
+    { key: "downpour", name: "Downpour", engine: "columns", treatment: "ink", themes: ["water", "loss"], energy: 0.5, grit: 0.35, preference: 0.6 },
+    { key: "curtainfall", name: "Curtainfall", engine: "columns", treatment: "wash", themes: ["loss", "night"], energy: 0.3, grit: 0.2, preference: 0.6 },
+    { key: "ticker", name: "Ticker", engine: "columns", treatment: "neon", themes: ["city", "motion"], energy: 0.75, grit: 0.5, preference: 0.6 },
+    { key: "reeds", name: "Reeds", engine: "columns", treatment: "engrave", themes: ["nature", "water"], energy: 0.3, grit: 0.3, preference: 0.6 },
+    { key: "staticfall", name: "Static Fall", engine: "columns", treatment: "halftone", themes: ["city", "night"], energy: 0.65, grit: 0.75, preference: 0.6 },
     // ---- radiance ------------------------------------------------------------
     { key: "monstrance", name: "Monstrance", engine: "radiance", treatment: "ink", themes: ["transcendence", "fire"], energy: 0.55, grit: 0.3 },
     { key: "annunciation", name: "Annunciation", engine: "radiance", treatment: "engrave", themes: ["transcendence", "love"], energy: 0.45, grit: 0.3 },
@@ -2368,14 +2368,14 @@ button:disabled {
     { key: "horizonband", name: "Horizon Band", engine: "strata", treatment: "screenprint", themes: ["loss", "memory"], energy: 0.55, grit: 0.5 },
     { key: "seam", name: "Seam", engine: "strata", treatment: "engrave", themes: ["loss", "city"], energy: 0.35, grit: 0.35 },
     // ---- weave ---------------------------------------------------------------
-    { key: "warpweft", name: "Warp & Weft", engine: "weave", treatment: "ink", themes: ["memory", "body"], energy: 0.4, grit: 0.3 },
-    { key: "sackcloth", name: "Sackcloth", engine: "weave", treatment: "woodcut", themes: ["loss", "defiance"], energy: 0.6, grit: 0.75 },
-    { key: "tartan", name: "Tartan", engine: "weave", treatment: "riso", themes: ["memory", "love"], energy: 0.5, grit: 0.45 },
-    { key: "gauze", name: "Gauze", engine: "weave", treatment: "wash", themes: ["love", "night"], energy: 0.25, grit: 0.2 },
+    { key: "warpweft", name: "Warp & Weft", engine: "weave", treatment: "ink", themes: ["memory", "body"], energy: 0.4, grit: 0.3, preference: 0.45 },
+    { key: "sackcloth", name: "Sackcloth", engine: "weave", treatment: "woodcut", themes: ["loss", "defiance"], energy: 0.6, grit: 0.75, preference: 0.45 },
+    { key: "tartan", name: "Tartan", engine: "weave", treatment: "riso", themes: ["memory", "love"], energy: 0.5, grit: 0.45, preference: 0.45 },
+    { key: "gauze", name: "Gauze", engine: "weave", treatment: "wash", themes: ["love", "night"], energy: 0.25, grit: 0.2, preference: 0.45 },
     // ---- moire ---------------------------------------------------------------
-    { key: "interference", name: "Interference", engine: "moire", treatment: "ink", themes: ["city", "night"], energy: 0.55, grit: 0.4 },
-    { key: "beatfrequency", name: "Beat Frequency", engine: "moire", treatment: "neon", themes: ["city", "motion"], energy: 0.85, grit: 0.5 },
-    { key: "gridlock", name: "Gridlock", engine: "moire", treatment: "blueprint", themes: ["city", "defiance"], energy: 0.5, grit: 0.4 },
+    { key: "interference", name: "Interference", engine: "moire", treatment: "ink", themes: ["city", "night"], energy: 0.55, grit: 0.4, preference: 0.4 },
+    { key: "beatfrequency", name: "Beat Frequency", engine: "moire", treatment: "neon", themes: ["city", "motion"], energy: 0.85, grit: 0.5, preference: 0.4 },
+    { key: "gridlock", name: "Gridlock", engine: "moire", treatment: "blueprint", themes: ["city", "defiance"], energy: 0.5, grit: 0.4, preference: 0.4 },
     // ---- fracture ------------------------------------------------------------
     { key: "faultline", name: "Fault Line", engine: "fracture", treatment: "ink", themes: ["defiance", "loss"], energy: 0.75, grit: 0.5 },
     { key: "blockcut", name: "Block Cut", engine: "fracture", treatment: "woodcut", themes: ["defiance", "fire"], energy: 0.9, grit: 0.85 },
@@ -2403,11 +2403,44 @@ button:disabled {
     { key: "deepfield", name: "Deep Field", engine: "constellation", treatment: "neon", themes: ["night", "transcendence"], energy: 0.5, grit: 0.35 },
     { key: "nightgarden", name: "Night Garden", engine: "constellation", treatment: "stipple", themes: ["night", "nature"], energy: 0.35, grit: 0.4 },
     // ---- drift ---------------------------------------------------------------
-    { key: "ashfall", name: "Ashfall", engine: "drift", treatment: "ink", themes: ["loss", "fire"], energy: 0.45, grit: 0.5 },
-    { key: "snowblind", name: "Snowblind", engine: "drift", treatment: "stipple", themes: ["loss", "night"], energy: 0.3, grit: 0.4 },
-    { key: "interferencefield", name: "Signal Loss", engine: "drift", treatment: "halftone", themes: ["city", "loss"], energy: 0.6, grit: 0.8 },
-    { key: "pollen", name: "Pollen", engine: "drift", treatment: "wash", themes: ["nature", "love"], energy: 0.3, grit: 0.25 },
-    { key: "chaff", name: "Chaff", engine: "drift", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.7, grit: 0.65 }
+    { key: "ashfall", name: "Ashfall", engine: "drift", treatment: "ink", themes: ["loss", "fire"], energy: 0.45, grit: 0.5, preference: 0.5 },
+    { key: "snowblind", name: "Snowblind", engine: "drift", treatment: "stipple", themes: ["loss", "night"], energy: 0.3, grit: 0.4, preference: 0.5 },
+    { key: "interferencefield", name: "Signal Loss", engine: "drift", treatment: "halftone", themes: ["city", "loss"], energy: 0.6, grit: 0.8, preference: 0.5 },
+    { key: "pollen", name: "Pollen", engine: "drift", treatment: "wash", themes: ["nature", "love"], energy: 0.3, grit: 0.25, preference: 0.5 },
+    { key: "chaff", name: "Chaff", engine: "drift", treatment: "sketch", themes: ["defiance", "motion"], energy: 0.7, grit: 0.65, preference: 0.5 },
+    // ---- aurora --------------------------------------------------------------
+    { key: "northernlight", name: "Northern Light", engine: "aurora", treatment: "aura", themes: ["transcendence", "night"], energy: 0.45, grit: 0.25, preference: 1.35 },
+    { key: "solarwind", name: "Solar Wind", engine: "aurora", treatment: "neon", themes: ["motion", "transcendence"], energy: 0.75, grit: 0.4, preference: 1.3 },
+    { key: "hanginglight", name: "Hanging Light", engine: "aurora", treatment: "smoke", themes: ["loss", "night"], energy: 0.3, grit: 0.3, preference: 1.3 },
+    { key: "seafire", name: "Sea Fire", engine: "aurora", treatment: "wash", themes: ["water", "love"], energy: 0.4, grit: 0.25, preference: 1.25 },
+    // ---- nebula --------------------------------------------------------------
+    { key: "stellarnursery", name: "Stellar Nursery", engine: "nebula", treatment: "aura", themes: ["night", "transcendence"], energy: 0.4, grit: 0.3, preference: 1.35 },
+    { key: "darkmatter", name: "Dark Matter", engine: "nebula", treatment: "smoke", themes: ["night", "loss"], energy: 0.3, grit: 0.35, preference: 1.3 },
+    { key: "ionstorm", name: "Ion Storm", engine: "nebula", treatment: "neon", themes: ["fire", "defiance"], energy: 0.8, grit: 0.5, preference: 1.25 },
+    { key: "emberfield", name: "Ember Field", engine: "nebula", treatment: "ink", themes: ["fire", "memory"], energy: 0.5, grit: 0.4, preference: 1.2 },
+    // ---- rose window ---------------------------------------------------------
+    { key: "rosewindow", name: "Rose Window", engine: "rose", treatment: "aura", themes: ["transcendence", "love"], energy: 0.5, grit: 0.3, preference: 1.4 },
+    { key: "sanctuary", name: "Sanctuary", engine: "rose", treatment: "ink", themes: ["transcendence", "memory"], energy: 0.45, grit: 0.3, preference: 1.3 },
+    { key: "kaleidoscope", name: "Kaleidoscope", engine: "rose", treatment: "riso", themes: ["love", "body"], energy: 0.6, grit: 0.45, preference: 1.25 },
+    { key: "reredos", name: "Reredos", engine: "rose", treatment: "woodcut", themes: ["transcendence", "defiance"], energy: 0.7, grit: 0.75, preference: 1.2 },
+    { key: "compassrose", name: "Compass Rose", engine: "rose", treatment: "engrave", themes: ["motion", "memory"], energy: 0.4, grit: 0.35, preference: 1.15 },
+    // ---- veil ----------------------------------------------------------------
+    { key: "farshore", name: "Far Shore", engine: "veil", treatment: "smoke", themes: ["loss", "water"], energy: 0.25, grit: 0.25, preference: 1.35 },
+    { key: "firstlight", name: "First Light", engine: "veil", treatment: "aura", themes: ["transcendence", "memory"], energy: 0.35, grit: 0.25, preference: 1.35 },
+    { key: "longview", name: "Long View", engine: "veil", treatment: "wash", themes: ["memory", "nature"], energy: 0.3, grit: 0.2, preference: 1.3 },
+    { key: "duststorm", name: "Dust Storm", engine: "veil", treatment: "ink", themes: ["motion", "loss"], energy: 0.55, grit: 0.5, preference: 1.2 },
+    // ---- atmospheric passes over the original engines -------------------------
+    { key: "thurible", name: "Thurible", engine: "radiance", treatment: "smoke", themes: ["transcendence", "memory"], energy: 0.4, grit: 0.35, preference: 1.3 },
+    { key: "sunstruck", name: "Sunstruck", engine: "radiance", treatment: "aura", themes: ["fire", "love"], energy: 0.6, grit: 0.3, preference: 1.4 },
+    { key: "deepwater", name: "Deep Water", engine: "constellation", treatment: "aura", themes: ["night", "water"], energy: 0.35, grit: 0.3, preference: 1.35 },
+    { key: "wakefield", name: "Wake", engine: "constellation", treatment: "smoke", themes: ["loss", "night"], energy: 0.3, grit: 0.3, preference: 1.25 },
+    { key: "shockwave", name: "Shockwave", engine: "shatter", treatment: "aura", themes: ["defiance", "fire"], energy: 0.85, grit: 0.55, preference: 1.25 },
+    { key: "stormglass", name: "Storm Glass", engine: "fracture", treatment: "smoke", themes: ["defiance", "loss"], energy: 0.7, grit: 0.5, preference: 1.2 },
+    { key: "oldgrowth", name: "Old Growth", engine: "growth", treatment: "smoke", themes: ["nature", "memory"], energy: 0.4, grit: 0.35, preference: 1.25 },
+    { key: "phosphor", name: "Phosphor", engine: "growth", treatment: "aura", themes: ["body", "nature"], energy: 0.55, grit: 0.35, preference: 1.25 },
+    { key: "reliquarylight", name: "Reliquary Light", engine: "strata", treatment: "aura", themes: ["memory", "transcendence"], energy: 0.4, grit: 0.3, preference: 1.2 },
+    { key: "gravitywell", name: "Gravity Well", engine: "orbits", treatment: "aura", themes: ["transcendence", "night"], energy: 0.45, grit: 0.3, preference: 1.25 },
+    { key: "seaglass", name: "Sea Glass", engine: "bloom", treatment: "aura", themes: ["water", "love"], energy: 0.4, grit: 0.3, preference: 1.2 }
   ];
   var STYLE_BY_KEY = new Map(STYLES.map((s) => [s.key, s]));
   function chooseStyle(themes, energy, grit, seed) {
@@ -2425,7 +2458,8 @@ button:disabled {
       const energyScore = 1 - Math.abs(style.energy - energy);
       const gritScore = 1 - Math.abs(style.grit - grit);
       const jitter = ((seed ^ Math.imul(i + 1, 2654435769)) >>> 0) / 4294967295 * 0.18;
-      const score = themeScore * 2.4 + energyScore * 0.8 + gritScore * 0.5 + jitter;
+      const preference = style.preference ?? 1;
+      const score = themeScore * 2.4 + energyScore * 0.8 + gritScore * 0.5 + jitter + (preference - 1) * 2.2;
       if (score > bestScore) {
         bestScore = score;
         best = style;
@@ -2602,6 +2636,262 @@ button:disabled {
       return [x + nx * amount, y + ny * amount];
     });
   }
+
+  // src/art/engines/atmospheric.ts
+  function* aurora(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const curtains = Math.round(3 + genome.density * 7);
+    for (let c = 0; c < curtains; c += 1) {
+      const originX = rng.range(-width * 0.1, width * 1.1);
+      const baseY = height * rng.range(-0.05, 0.35);
+      const drop = height * rng.range(0.4, 0.95);
+      const spread = unit * rng.range(0.08, 0.3);
+      const strands = Math.round(40 + genome.density * 160);
+      const tone = rng.next();
+      for (let g = 0; g < 4; g += 1) {
+        scene.glows.push({
+          x: originX + rng.gaussian(0, spread * 0.7),
+          y: baseY + drop * rng.range(0.15, 0.8),
+          radius: spread * rng.range(1.4, 3),
+          tone,
+          accent: rng.next() > 0.8,
+          strength: 0.035 + rng.next() * 0.075
+        });
+      }
+      for (let s = 0; s < strands; s += 1) {
+        const offset = rng.gaussian(0, spread * 0.55);
+        const x0 = originX + offset;
+        const loudness = arcAt(x0 / width);
+        const startY = baseY + drop * rng.range(-0.08, 0.42);
+        const length = drop * rng.range(0.35, 1) * loudness;
+        const steps = Math.max(6, Math.round(length / (unit * 0.02)));
+        const points = [];
+        for (let i = 0; i <= steps; i += 1) {
+          const t = i / steps;
+          const y = startY + length * t;
+          const fold = Math.sin(t * Math.PI * 1.6 + c * 1.3) * spread * 0.5 * t;
+          const drift2 = (noise(x0 * 2e-3 + c, y * 16e-4) - 0.5) * unit * 0.09 * genome.turbulence;
+          points.push([x0 + fold + drift2, y]);
+        }
+        const falloff = Math.exp(-Math.pow(offset / (spread * 0.85), 2));
+        push(scene, points, {
+          tone: Math.min(1, tone + rng.range(-0.15, 0.15)),
+          weight: rng.range(0.3, 2.2) * (0.4 + genome.weight),
+          // Low alpha is deliberate: the light comes from accumulation.
+          alpha: (0.05 + rng.next() * 0.2) * loudness * falloff,
+          accent: rng.next() > 0.93,
+          layer: rng.next() > 0.93 ? 1 : 0
+        });
+      }
+      yield (c + 1) / curtains;
+    }
+  }
+  function* nebula(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const cores = 2 + Math.round(genome.gravity * 4);
+    const centres = [];
+    for (let i = 0; i < cores; i += 1) {
+      centres.push([rng.range(width * 0.15, width * 0.85), rng.range(height * 0.15, height * 0.85)]);
+    }
+    const puffs = Math.round(24 + genome.density * 90);
+    for (let i = 0; i < puffs; i += 1) {
+      const centre = centres[rng.int(0, centres.length - 1)];
+      const spreadRadius = unit * rng.range(0.05, 0.4);
+      scene.glows.push({
+        x: centre[0] + rng.gaussian(0, unit * 0.16),
+        y: centre[1] + rng.gaussian(0, unit * 0.16),
+        radius: spreadRadius,
+        tone: rng.next(),
+        accent: rng.next() > 0.88,
+        strength: 0.04 + rng.next() * 0.12
+      });
+      if (i % 20 === 0) yield i / puffs * 0.3;
+    }
+    const filaments = Math.round(30 + genome.density * 200);
+    for (let i = 0; i < filaments; i += 1) {
+      const centre = centres[rng.int(0, centres.length - 1)];
+      let x = centre[0] + rng.gaussian(0, unit * 0.22);
+      let y = centre[1] + rng.gaussian(0, unit * 0.22);
+      const steps = Math.round(12 + rng.next() * 40);
+      const step = unit * 8e-3;
+      const points = [[x, y]];
+      for (let s = 0; s < steps; s += 1) {
+        const angle = noise(x * 16e-4, y * 16e-4) * Math.PI * 4;
+        x += Math.cos(angle) * step;
+        y += Math.sin(angle) * step;
+        points.push([x, y]);
+      }
+      push(scene, points, {
+        tone: rng.next(),
+        weight: rng.range(0.3, 1.6) * (0.4 + genome.weight),
+        alpha: 0.06 + rng.next() * 0.22,
+        accent: rng.next() > 0.94,
+        layer: 0
+      });
+      if (i % 40 === 0) yield 0.3 + i / filaments * 0.35;
+    }
+    const stars = Math.round(120 + genome.density * 600);
+    for (let i = 0; i < stars; i += 1) {
+      const x = rng.range(0, width);
+      const y = rng.range(0, height);
+      const bias = noise(x * 2e-3, y * 2e-3) * arcAt(x / width);
+      if (rng.next() > bias * 1.2) continue;
+      const brightness = rng.next();
+      const size = unit * 11e-4 * rng.range(0.4, 3) * (1 + genome.weight);
+      push(scene, circlePoints(x, y, size, 10), {
+        closed: true,
+        fill: true,
+        tone: brightness,
+        weight: 0.5,
+        alpha: 0.3 + brightness * 0.6,
+        accent: brightness > 0.94,
+        layer: brightness > 0.94 ? 1 : 0
+      });
+      if (brightness > 0.94) {
+        scene.glows.push({
+          x,
+          y,
+          radius: size * 16,
+          tone: 0.1,
+          accent: true,
+          strength: 0.3
+        });
+      }
+      if (i % 120 === 0) yield 0.65 + i / stars * 0.35;
+    }
+  }
+  function* rose(env) {
+    const { width, height, unit, scene, rng, noise, genome } = env;
+    const cx = width / 2 + rng.gaussian(0, unit * 0.02);
+    const cy = height / 2 + rng.gaussian(0, unit * 0.02);
+    const outer = Math.min(width, height) * 0.46;
+    const petals = [6, 8, 10, 12, 16, 20][Math.floor(genome.symmetry * 5.99)] ?? 12;
+    scene.glows.push({
+      x: cx,
+      y: cy,
+      radius: outer * 0.45,
+      tone: 0.1,
+      accent: true,
+      strength: 0.85
+    });
+    const rings = Math.round(3 + genome.density * 7);
+    for (let ring = 0; ring < rings; ring += 1) {
+      const t = (ring + 1) / rings;
+      const inner = outer * (t - 1 / rings) * 0.95;
+      const edge = outer * t;
+      const count = petals * (ring % 2 === 0 ? 1 : 2);
+      for (let p = 0; p < count; p += 1) {
+        const angle = p / count * Math.PI * 2 + ring * 0.12;
+        const halfWidth = Math.PI / count * rng.range(0.55, 0.92);
+        const points = [
+          ...arcPoints(cx, cy, Math.max(inner, outer * 0.06), angle - halfWidth, halfWidth * 2, 12),
+          ...arcPoints(cx, cy, edge, angle + halfWidth, -halfWidth * 2, 12)
+        ];
+        push(scene, points, {
+          closed: true,
+          fill: rng.next() < 0.45,
+          tone: (ring / rings + rng.range(-0.1, 0.1) + 1) % 1,
+          weight: 0.6 + genome.weight * 2,
+          alpha: 0.25 + rng.next() * 0.45,
+          accent: p % Math.max(2, Math.round(count / 4)) === 0,
+          layer: p % Math.max(2, Math.round(count / 4)) === 0 ? 1 : 0
+        });
+      }
+      push(scene, circlePoints(cx, cy, edge, 96), {
+        closed: true,
+        tone: 0.85,
+        weight: 0.8 + genome.weight * 2.4,
+        alpha: 0.5,
+        accent: ring === rings - 1,
+        layer: 1
+      });
+      yield 0.15 + ring / rings * 0.7;
+    }
+    for (let p = 0; p < petals * 2; p += 1) {
+      const angle = p / (petals * 2) * Math.PI * 2;
+      const points = [];
+      for (let s = 0; s <= 20; s += 1) {
+        const r = outer * 0.06 + (outer * 0.98 - outer * 0.06) * (s / 20);
+        const wobble = (noise(Math.cos(angle) * r * 0.01, Math.sin(angle) * r * 0.01) - 0.5) * genome.turbulence * 0.25;
+        points.push([cx + Math.cos(angle + wobble) * r, cy + Math.sin(angle + wobble) * r]);
+      }
+      push(scene, points, {
+        tone: 0.7,
+        weight: 0.6 + genome.weight * 1.8,
+        alpha: 0.35 + rng.next() * 0.35,
+        accent: p % 4 === 0,
+        layer: 0
+      });
+    }
+    yield 1;
+  }
+  function* veil(env) {
+    const { width, height, unit, scene, rng, noise, genome, arcAt } = env;
+    const horizon = height * rng.range(0.38, 0.66);
+    for (let g = 0; g < 5; g += 1) {
+      scene.glows.push({
+        x: width * rng.range(0.3, 0.7),
+        y: horizon + rng.gaussian(0, unit * 0.03),
+        radius: unit * rng.range(0.25, 0.7),
+        tone: 0.15,
+        accent: g === 0,
+        strength: 0.1 + rng.next() * 0.18
+      });
+    }
+    const bands = Math.round(10 + genome.density * 40);
+    for (let b = 0; b < bands; b += 1) {
+      const t = b / bands;
+      const distance = Math.pow(t, 1.8);
+      const y = horizon + (b % 2 === 0 ? -1 : 1) * distance * height * 0.55;
+      const loudness = arcAt(t);
+      const strokes = Math.round(6 + genome.density * 26);
+      for (let s = 0; s < strokes; s += 1) {
+        const yy = y + rng.gaussian(0, unit * 0.012 * (1 + distance * 3));
+        const segments = Math.max(12, Math.round(width / (unit * 0.03)));
+        const points = [];
+        for (let i = 0; i <= segments; i += 1) {
+          const x = i / segments * width;
+          const sag = (noise(x * 12e-4, yy * 3e-3 + b) - 0.5) * unit * 0.05 * genome.turbulence;
+          points.push([x, yy + sag]);
+        }
+        push(scene, points, {
+          tone: 1 - distance,
+          // Far bands are lighter and thinner: aerial perspective.
+          weight: (0.3 + (1 - distance) * 2.4) * (0.4 + genome.weight),
+          alpha: (0.05 + (1 - distance) * 0.3) * loudness,
+          accent: rng.next() > 0.96,
+          layer: 0
+        });
+      }
+      yield (b + 1) / bands;
+    }
+  }
+  var ATMOSPHERIC_ENGINES = [
+    {
+      key: "aurora",
+      label: "Aurora",
+      description: "Curtains of light hung from the top of the picture, folding as they fall. Built from thousands of faint strands that only become bright where they overlap.",
+      run: aurora
+    },
+    {
+      key: "nebula",
+      label: "Nebula",
+      description: "Volumetric cloud lit from within, threaded with filaments and studded with stars. Depth without a single hard edge.",
+      run: nebula
+    },
+    {
+      key: "rose",
+      label: "Rose Window",
+      description: "Radial symmetry around a burning centre \u2014 petals, rings, and tracery, ordered the way a window is ordered.",
+      run: rose
+    },
+    {
+      key: "veil",
+      label: "Veil",
+      description: "Bands of haze receding toward a horizon, thinning and paling with distance. The subject is the air itself.",
+      run: veil
+    }
+  ];
 
   // src/art/engines/broken.ts
   function splitShard(shard, angle, bias) {
@@ -3426,6 +3716,24 @@ button:disabled {
       });
       yield 0.7 + i / orbits2 * 0.3;
     }
+    const motes = Math.round(90 + genome.density * 700);
+    for (let i = 0; i < motes; i += 1) {
+      const angle = rng.range(0, Math.PI * 2);
+      const r = core + Math.pow(rng.next(), 1.7) * maxRadius;
+      const x = cx + Math.cos(angle) * r;
+      const y = cy + Math.sin(angle) * r;
+      const size = unit * 11e-4 * rng.range(0.4, 3.2) * (1 + genome.weight);
+      push(scene, circlePoints(x, y, size, 8), {
+        closed: true,
+        fill: true,
+        tone: rng.next(),
+        weight: 0.5,
+        alpha: 0.16 + rng.next() * 0.55,
+        accent: rng.next() > 0.85,
+        layer: rng.next() > 0.85 ? 1 : 0
+      });
+      if (i % 120 === 0) yield 0.9 + i / motes * 0.1;
+    }
   }
   function* spiral(env) {
     const { width, height, unit, scene, rng, noise, genome } = env;
@@ -3567,6 +3875,7 @@ button:disabled {
 
   // src/art/engines/index.ts
   var ENGINES = [
+    ...ATMOSPHERIC_ENGINES,
     ...FIELD_ENGINES,
     ...RADIAL_ENGINES,
     ...LAYERED_ENGINES,
@@ -3732,18 +4041,20 @@ button:disabled {
     ctx.fillRect(0, 0, width, height);
   }
   function bloom2(env, strength) {
-    const { ctx, width, height } = env;
+    const { ctx, width, height, unit } = env;
     const scratch = document.createElement("canvas");
-    scratch.width = Math.max(1, Math.round(width / 6));
-    scratch.height = Math.max(1, Math.round(height / 6));
+    scratch.width = width;
+    scratch.height = height;
     const sctx = scratch.getContext("2d");
     if (!sctx) return;
-    sctx.drawImage(ctx.canvas, 0, 0, scratch.width, scratch.height);
+    if (!("filter" in sctx)) return;
+    sctx.filter = `blur(${Math.max(2, unit * 0.012)}px)`;
+    sctx.drawImage(ctx.canvas, 0, 0);
+    sctx.filter = "none";
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = strength;
-    ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(scratch, 0, 0, width, height);
+    ctx.drawImage(scratch, 0, 0);
     ctx.restore();
   }
   function halftoneScreen(env, pitch) {
@@ -3783,7 +4094,7 @@ button:disabled {
       label: "Ink",
       description: "Clean strokes and solid regions. The geometry, stated plainly.",
       plottable: true,
-      paint: { glows: true, lineCap: "round" },
+      paint: { luminous: true, lineCap: "round" },
       finish: (env) => {
         vignette(env);
         grain(env, env.genome.grain * 0.7);
@@ -3795,7 +4106,7 @@ button:disabled {
       description: "Every region becomes crossed pen lines. Tone exists only as line density.",
       plottable: true,
       transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 0.012, cross: true, keepOutline: true, tonal: true }),
-      paint: { strokeOnly: true, lineCap: "round" },
+      paint: { strokeOnly: true, lineCap: "round", glows: false },
       finish: (env) => {
         vignette(env);
         grain(env, env.genome.grain * 0.5);
@@ -3807,7 +4118,7 @@ button:disabled {
       description: "Fine parallel rulings, tightening where the image darkens. Banknote logic.",
       plottable: true,
       transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 6e-3, cross: false, keepOutline: false, tonal: true }),
-      paint: { strokeOnly: true, weightScale: 0.6, lineCap: "butt" },
+      paint: { strokeOnly: true, weightScale: 0.6, lineCap: "butt", glows: false },
       finish: (env) => {
         vignette(env);
         grain(env, env.genome.grain * 0.35);
@@ -3819,7 +4130,7 @@ button:disabled {
       description: "Nothing but dots. Density does all the work that a line would normally do.",
       plottable: true,
       transform: (marks, ctx) => stipple(marks, ctx),
-      paint: { strokeOnly: true, lineCap: "round", weightScale: 1.4 },
+      paint: { strokeOnly: true, lineCap: "round", weightScale: 1.4, glows: false },
       finish: (env) => {
         vignette(env);
         grain(env, env.genome.grain * 0.4);
@@ -3831,7 +4142,7 @@ button:disabled {
       description: "Each mark drawn two or three times, never quite landing in the same place.",
       plottable: true,
       transform: (marks, ctx) => sketchPasses(marks, ctx, 3, 6e-3),
-      paint: { strokeOnly: true, alphaScale: 0.8, lineCap: "round" },
+      paint: { strokeOnly: true, alphaScale: 0.8, lineCap: "round", glows: false },
       finish: (env) => {
         paperTexture(env);
         vignette(env);
@@ -3848,7 +4159,7 @@ button:disabled {
         alpha: 1,
         weight: m.weight * (2.2 + ctx.genome.weight)
       })),
-      paint: { strokeOnly: true, lineCap: "butt", alphaScale: 1 },
+      paint: { strokeOnly: true, lineCap: "butt", alphaScale: 1, glows: false },
       finish: (env) => {
         paperTexture(env);
         grain(env, env.genome.grain * 0.8);
@@ -3861,7 +4172,7 @@ button:disabled {
       plottable: true,
       groundShift: { lightness: -46, saturation: 34 },
       transform: (marks, ctx) => hatchFills(marks, ctx, { spacing: 0.016, cross: false, keepOutline: true, tonal: false }),
-      paint: { strokeOnly: true, weightScale: 0.7, lineCap: "butt" },
+      paint: { strokeOnly: true, weightScale: 0.7, lineCap: "butt", glows: false },
       finish: (env) => {
         vignette(env);
         grain(env, 0.25);
@@ -3897,7 +4208,7 @@ button:disabled {
       label: "Wash",
       description: "Soft, wide, translucent strokes that pool and bleed into one another.",
       plottable: false,
-      paint: { weightScale: 5.5, alphaScale: 0.22, lineCap: "round", glows: true },
+      paint: { weightScale: 5.5, alphaScale: 0.22, lineCap: "round", luminous: true },
       finish: (env) => {
         bloom2(env, 0.35);
         paperTexture(env);
@@ -3911,7 +4222,7 @@ button:disabled {
       description: "Light rather than pigment \u2014 every line glows, and the dark does the rest.",
       plottable: false,
       groundShift: { lightness: -30 },
-      paint: { blend: "lighter", glows: true, lineCap: "round", alphaScale: 0.75 },
+      paint: { blend: "lighter", lineCap: "round", alphaScale: 0.75 },
       finish: (env) => {
         bloom2(env, 0.6);
         vignette(env);
@@ -3919,11 +4230,40 @@ button:disabled {
       }
     },
     {
+      key: "aura",
+      label: "Aura",
+      description: "Marks lit from within and left to bleed into one another, so the picture reads as light in a volume rather than ink on a surface.",
+      plottable: false,
+      // Light in a volume needs a dark volume. On pale ground the glow has
+      // nothing to burn against and everything washes out to pastel.
+      groundShift: { lightness: -34, saturation: 10 },
+      paint: { luminous: true, weightScale: 2.4, alphaScale: 0.5, lineCap: "round" },
+      finish: (env) => {
+        bloom2(env, 0.34);
+        vignette(env);
+        grain(env, env.genome.grain * 0.55);
+      }
+    },
+    {
+      key: "smoke",
+      label: "Smoke",
+      description: "Everything softened and stacked into depth, near forms reading dark against far ones. Atmosphere doing the drawing.",
+      plottable: false,
+      groundShift: { lightness: -26, saturation: 6 },
+      paint: { luminous: true, weightScale: 3.6, alphaScale: 0.3, lineCap: "round" },
+      finish: (env) => {
+        bloom2(env, 0.28);
+        paperTexture(env);
+        vignette(env);
+        grain(env, env.genome.grain * 0.7);
+      }
+    },
+    {
       key: "halftone",
       label: "Halftone",
       description: "The whole image resolved into a printer\u2019s dot screen, coarse enough to see.",
       plottable: false,
-      paint: { lineCap: "round", weightScale: 1.6 },
+      paint: { lineCap: "round", weightScale: 1.6, luminous: true },
       finish: (env) => {
         halftoneScreen(env, Math.max(3, env.unit * 45e-4));
         vignette(env);
@@ -4476,12 +4816,12 @@ button:disabled {
       Math.min(96, saturation * 1.5 + 18),
       nocturne ? 62 + arousal * 16 : 48 + arousal * 10
     );
-    const veil = hsl(
+    const veil2 = hsl(
       baseHue + rng.range(-20, 20),
       saturation * 0.35,
       nocturne ? 74 : 22
     );
-    return { ground, marks, accent, veil, nocturne };
+    return { ground, marks, accent, veil: veil2, nocturne };
   }
 
   // src/art/rng.ts
@@ -4617,7 +4957,11 @@ button:disabled {
     ctx.save();
     ctx.lineCap = hints.lineCap ?? "round";
     ctx.lineJoin = "round";
-    if (hints.blend) ctx.globalCompositeOperation = hints.blend;
+    if (hints.blend) {
+      ctx.globalCompositeOperation = hints.blend;
+    } else if (hints.luminous) {
+      ctx.globalCompositeOperation = palette.nocturne ? "lighter" : "multiply";
+    }
     const deadline = performance.now() + budgetMs;
     let i = from;
     for (; i < marks.length; i += 1) {
@@ -4730,7 +5074,7 @@ button:disabled {
             if (result.done) stage = "transform";
           } else if (stage === "transform") {
             marks = treatment.transform ? treatment.transform(scene.marks, { unit, rng, noise, genome: biased }) : scene.marks;
-            if (treatment.paint?.glows !== false && (treatment.paint?.glows ?? false)) {
+            if (treatment.paint?.glows !== false) {
               paintGlows(paintEnv, scene);
             }
             options.onProgress?.(0.6);

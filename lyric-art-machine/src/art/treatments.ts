@@ -44,9 +44,19 @@ export interface PaintHints {
   /** Regions are outlined rather than filled. */
   strokeOnly?: boolean;
   blend?: GlobalCompositeOperation;
+  /**
+   * Additive on dark grounds, multiply on pale ones. This is where depth comes
+   * from — overlapping marks accumulate into light instead of just stacking
+   * opaquely — and it is the single biggest difference between a picture that
+   * glows and one that sits flat on the page.
+   */
+  luminous?: boolean;
   weightScale?: number;
   alphaScale?: number;
-  /** Honour the scene's raster glows. */
+  /**
+   * Honour the scene's raster glows. Defaults to true; only strict line-work
+   * treatments switch it off, because a pen genuinely cannot draw a glow.
+   */
   glows?: boolean;
   lineCap?: CanvasLineCap;
 }
@@ -253,21 +263,34 @@ function vignette(env: FinishEnv): void {
   ctx.fillRect(0, 0, width, height);
 }
 
-/** Bloom: blur-ish light spill, faked by scaling the canvas into itself. */
+/**
+ * Bloom: light spilling out of bright areas.
+ *
+ * Blurred at full resolution rather than by downscaling. Scaling a canvas into
+ * itself is the cheap way to blur, but once the added light clips to white the
+ * clipping contour follows the interpolation, and hard-edged rectangles appear
+ * across the picture. Blurring at 1:1 removes the interpolation entirely.
+ */
 function bloom(env: FinishEnv, strength: number): void {
-  const { ctx, width, height } = env;
+  const { ctx, width, height, unit } = env;
   const scratch = document.createElement('canvas');
-  scratch.width = Math.max(1, Math.round(width / 6));
-  scratch.height = Math.max(1, Math.round(height / 6));
+  scratch.width = width;
+  scratch.height = height;
   const sctx = scratch.getContext('2d');
   if (!sctx) return;
-  sctx.drawImage(ctx.canvas, 0, 0, scratch.width, scratch.height);
+
+  // Without canvas filters there is no cheap true blur, so skip the bloom
+  // rather than fake it badly.
+  if (!('filter' in sctx)) return;
+
+  sctx.filter = `blur(${Math.max(2, unit * 0.012)}px)`;
+  sctx.drawImage(ctx.canvas, 0, 0);
+  sctx.filter = 'none';
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.globalAlpha = strength;
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(scratch, 0, 0, width, height);
+  ctx.drawImage(scratch, 0, 0);
   ctx.restore();
 }
 
@@ -314,7 +337,7 @@ export const TREATMENTS: Treatment[] = [
     label: 'Ink',
     description: 'Clean strokes and solid regions. The geometry, stated plainly.',
     plottable: true,
-    paint: { glows: true, lineCap: 'round' },
+    paint: { luminous: true, lineCap: 'round' },
     finish: (env) => {
       vignette(env);
       grain(env, env.genome.grain * 0.7);
@@ -327,7 +350,7 @@ export const TREATMENTS: Treatment[] = [
     plottable: true,
     transform: (marks, ctx) =>
       hatchFills(marks, ctx, { spacing: 0.012, cross: true, keepOutline: true, tonal: true }),
-    paint: { strokeOnly: true, lineCap: 'round' },
+    paint: { strokeOnly: true, lineCap: 'round', glows: false },
     finish: (env) => {
       vignette(env);
       grain(env, env.genome.grain * 0.5);
@@ -340,7 +363,7 @@ export const TREATMENTS: Treatment[] = [
     plottable: true,
     transform: (marks, ctx) =>
       hatchFills(marks, ctx, { spacing: 0.006, cross: false, keepOutline: false, tonal: true }),
-    paint: { strokeOnly: true, weightScale: 0.6, lineCap: 'butt' },
+    paint: { strokeOnly: true, weightScale: 0.6, lineCap: 'butt', glows: false },
     finish: (env) => {
       vignette(env);
       grain(env, env.genome.grain * 0.35);
@@ -352,7 +375,7 @@ export const TREATMENTS: Treatment[] = [
     description: 'Nothing but dots. Density does all the work that a line would normally do.',
     plottable: true,
     transform: (marks, ctx) => stipple(marks, ctx),
-    paint: { strokeOnly: true, lineCap: 'round', weightScale: 1.4 },
+    paint: { strokeOnly: true, lineCap: 'round', weightScale: 1.4, glows: false },
     finish: (env) => {
       vignette(env);
       grain(env, env.genome.grain * 0.4);
@@ -364,7 +387,7 @@ export const TREATMENTS: Treatment[] = [
     description: 'Each mark drawn two or three times, never quite landing in the same place.',
     plottable: true,
     transform: (marks, ctx) => sketchPasses(marks, ctx, 3, 0.006),
-    paint: { strokeOnly: true, alphaScale: 0.8, lineCap: 'round' },
+    paint: { strokeOnly: true, alphaScale: 0.8, lineCap: 'round', glows: false },
     finish: (env) => {
       paperTexture(env);
       vignette(env);
@@ -382,7 +405,7 @@ export const TREATMENTS: Treatment[] = [
         alpha: 1,
         weight: m.weight * (2.2 + ctx.genome.weight),
       })),
-    paint: { strokeOnly: true, lineCap: 'butt', alphaScale: 1 },
+    paint: { strokeOnly: true, lineCap: 'butt', alphaScale: 1, glows: false },
     finish: (env) => {
       paperTexture(env);
       grain(env, env.genome.grain * 0.8);
@@ -396,7 +419,7 @@ export const TREATMENTS: Treatment[] = [
     groundShift: { lightness: -46, saturation: 34 },
     transform: (marks, ctx) =>
       hatchFills(marks, ctx, { spacing: 0.016, cross: false, keepOutline: true, tonal: false }),
-    paint: { strokeOnly: true, weightScale: 0.7, lineCap: 'butt' },
+    paint: { strokeOnly: true, weightScale: 0.7, lineCap: 'butt', glows: false },
     finish: (env) => {
       vignette(env);
       grain(env, 0.25);
@@ -432,7 +455,7 @@ export const TREATMENTS: Treatment[] = [
     label: 'Wash',
     description: 'Soft, wide, translucent strokes that pool and bleed into one another.',
     plottable: false,
-    paint: { weightScale: 5.5, alphaScale: 0.22, lineCap: 'round', glows: true },
+    paint: { weightScale: 5.5, alphaScale: 0.22, lineCap: 'round', luminous: true },
     finish: (env) => {
       bloom(env, 0.35);
       paperTexture(env);
@@ -446,7 +469,7 @@ export const TREATMENTS: Treatment[] = [
     description: 'Light rather than pigment — every line glows, and the dark does the rest.',
     plottable: false,
     groundShift: { lightness: -30 },
-    paint: { blend: 'lighter', glows: true, lineCap: 'round', alphaScale: 0.75 },
+    paint: { blend: 'lighter', lineCap: 'round', alphaScale: 0.75 },
     finish: (env) => {
       bloom(env, 0.6);
       vignette(env);
@@ -454,11 +477,42 @@ export const TREATMENTS: Treatment[] = [
     },
   },
   {
+    key: 'aura',
+    label: 'Aura',
+    description:
+      'Marks lit from within and left to bleed into one another, so the picture reads as light in a volume rather than ink on a surface.',
+    plottable: false,
+    // Light in a volume needs a dark volume. On pale ground the glow has
+    // nothing to burn against and everything washes out to pastel.
+    groundShift: { lightness: -34, saturation: 10 },
+    paint: { luminous: true, weightScale: 2.4, alphaScale: 0.5, lineCap: 'round' },
+    finish: (env) => {
+      bloom(env, 0.34);
+      vignette(env);
+      grain(env, env.genome.grain * 0.55);
+    },
+  },
+  {
+    key: 'smoke',
+    label: 'Smoke',
+    description:
+      'Everything softened and stacked into depth, near forms reading dark against far ones. Atmosphere doing the drawing.',
+    plottable: false,
+    groundShift: { lightness: -26, saturation: 6 },
+    paint: { luminous: true, weightScale: 3.6, alphaScale: 0.3, lineCap: 'round' },
+    finish: (env) => {
+      bloom(env, 0.28);
+      paperTexture(env);
+      vignette(env);
+      grain(env, env.genome.grain * 0.7);
+    },
+  },
+  {
     key: 'halftone',
     label: 'Halftone',
     description: 'The whole image resolved into a printer’s dot screen, coarse enough to see.',
     plottable: false,
-    paint: { lineCap: 'round', weightScale: 1.6 },
+    paint: { lineCap: 'round', weightScale: 1.6, luminous: true },
     finish: (env) => {
       halftoneScreen(env, Math.max(3, env.unit * 0.0045));
       vignette(env);

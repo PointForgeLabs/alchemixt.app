@@ -139,17 +139,32 @@ parameters:
 
 A **style** is an engine crossed with a treatment.
 
-**17 engines** decide where forms go — Current, Terrain, Swarm, Columns,
-Radiance, Spiral, Orbits, Bloom, Strata, Weave, Moiré, Fracture, Shatter,
-Lattice, Growth, Constellation, Drift.
+**21 engines** decide where forms go. Four of them — Aurora, Nebula, Rose
+Window, Veil — are *atmospheric*: they build light in a volume around a
+subject (a centre, a horizon, a curtain) rather than making texture
+everywhere. Those are the machine's first choice. The all-over field engines
+still exist and are still selectable, but they carry a low `preference` and the
+machine rarely reaches for them, because handsome texture is still a picture of
+nothing in particular.
 
-**12 treatments** decide how a mark is realized — Ink, Cross-hatch, Engraving,
+The rest are Current, Terrain, Swarm, Columns, Radiance, Spiral, Orbits,
+Bloom, Strata, Weave, Moiré, Fracture, Shatter, Lattice, Growth,
+Constellation and Drift.
+
+**14 treatments** decide how a mark is realized — Ink, Cross-hatch, Engraving,
 Stipple, Sketch, Woodcut, Blueprint, Risograph, Screenprint, Wash, Neon,
-Halftone. Treatments run in two stages: a geometry stage that rewrites marks
+Halftone, and the two atmospheric ones, **Aura** and **Smoke**. Aura and Smoke
+force a dark ground: light in a volume needs a dark volume, and on pale stock
+the glow has nothing to burn against.
+
+Most treatments are **luminous** — additive on dark grounds, multiply on pale.
+That single flag is where depth comes from, since overlapping marks accumulate
+into light rather than stacking flat. It is the difference between a picture
+that glows and one that sits on the page. Treatments run in two stages: a geometry stage that rewrites marks
 (fills become hatching, a sketch redraws every line three times, riso splits
 into offset passes) and a raster finish the plotter path skips entirely.
 
-That crossing gives 204 combinations. **76 are named and catalogued** in
+That crossing gives close to 300 combinations. **104 are named and catalogued** in
 `catalog.ts`, chosen because the pairing produces something the engine alone
 does not — Growth under Woodcut is not Growth under Engraving. Each declares
 thematic affinity plus preferred energy and grit, so the machine picks one on

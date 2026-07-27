@@ -141,7 +141,9 @@ export function render(
           marks = treatment.transform
             ? treatment.transform(scene.marks, { unit, rng, noise, genome: biased })
             : scene.marks;
-          if (treatment.paint?.glows !== false && (treatment.paint?.glows ?? false)) {
+          // Glows are on unless a treatment opts out — the atmosphere is the
+          // point, and only strict line work has a reason to refuse it.
+          if (treatment.paint?.glows !== false) {
             paintGlows(paintEnv, scene);
           }
           options.onProgress?.(0.6);

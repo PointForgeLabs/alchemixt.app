@@ -99,7 +99,13 @@ export function paintMarks(
   ctx.save();
   ctx.lineCap = hints.lineCap ?? 'round';
   ctx.lineJoin = 'round';
-  if (hints.blend) ctx.globalCompositeOperation = hints.blend;
+  if (hints.blend) {
+    ctx.globalCompositeOperation = hints.blend;
+  } else if (hints.luminous) {
+    // Overlapping marks accumulate into light on a dark ground, and into
+    // density on a pale one. Without this, everything stacks flat.
+    ctx.globalCompositeOperation = palette.nocturne ? 'lighter' : 'multiply';
+  }
 
   const deadline = performance.now() + budgetMs;
   let i = from;

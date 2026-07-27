@@ -64,6 +64,27 @@ function* radiance(env: EngineEnv): Generator<number, void, unknown> {
     });
     yield 0.7 + (i / orbits) * 0.3;
   }
+
+  // Motes caught in the light. Biased toward the centre so the halo stays the
+  // subject — this is most of what gives the piece its sense of volume.
+  const motes = Math.round(90 + genome.density * 700);
+  for (let i = 0; i < motes; i += 1) {
+    const angle = rng.range(0, Math.PI * 2);
+    const r = core + Math.pow(rng.next(), 1.7) * maxRadius;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    const size = unit * 0.0011 * rng.range(0.4, 3.2) * (1 + genome.weight);
+    push(scene, circlePoints(x, y, size, 8), {
+      closed: true,
+      fill: true,
+      tone: rng.next(),
+      weight: 0.5,
+      alpha: 0.16 + rng.next() * 0.55,
+      accent: rng.next() > 0.85,
+      layer: rng.next() > 0.85 ? 1 : 0,
+    });
+    if (i % 120 === 0) yield 0.9 + (i / motes) * 0.1;
+  }
 }
 
 /** One continuous spiral, wound tight — obsession rendered as a single line. */
