@@ -681,6 +681,7 @@ button:disabled {
 }
 
 .plate {
+  white-space: pre-line;
   margin: 14px 0 0;
   font-family: var(--mono);
   font-size: 11px;
@@ -901,6 +902,13 @@ button:disabled {
 
           <!-- Pen plotter export -->
           <div class="plot-bar">
+            <label class="select-field">
+              <span>SVG</span>
+              <select id="svg-mode">
+                <option value="artwork" selected>Artwork · faithful vector</option>
+                <option value="plot">Plot · pen-ready lines</option>
+              </select>
+            </label>
             <label class="select-field">
               <span>Paper</span>
               <select id="paper-select">
@@ -5123,6 +5131,7 @@ button:disabled {
     square200: { label: "Square \xB7 200\xD7200mm", width: 200, height: 200 }
   };
   var DEFAULT_PLOT_OPTIONS = {
+    mode: "artwork",
     paper: "a4",
     margin: 12,
     penWidth: 0.3,
@@ -5221,8 +5230,9 @@ button:disabled {
     }
     return sum;
   }
-  function toPlotterSvg(marks, sourceWidth, sourceHeight, palette, options, title) {
+  function toPlotterSvg(marks, sourceWidth, sourceHeight, palette, options, title, scene) {
     const paper = PAPERS[options.paper];
+    const artwork = options.mode === "artwork";
     const sourceLandscape = sourceWidth > sourceHeight;
     const paperLandscape = paper.width > paper.height;
     const pageWidth = sourceLandscape === paperLandscape ? paper.width : paper.height;
@@ -5234,71 +5244,134 @@ button:disabled {
     const offsetY = options.margin + (drawHeight - sourceHeight * scale) / 2;
     const minLengthMm = 0.4;
     const minLengthPx = minLengthMm / scale;
-    const byPen = /* @__PURE__ */ new Map();
+    const minAlpha = artwork ? 0.02 : options.minAlpha ?? 0.08;
+    const paths = [];
     let dropped = 0;
     let totalPoints = 0;
     let totalLengthPx = 0;
-    const addPath = (pen, points) => {
+    const pensSeen = /* @__PURE__ */ new Set();
+    const add = (points, m) => {
       const length = polylineLength(points);
       if (points.length < 2 || length < minLengthPx) {
         dropped += 1;
         return;
       }
-      const bucket = byPen.get(pen) ?? [];
-      bucket.push(points);
-      byPen.set(pen, bucket);
+      const pen = options.separatePens ? m.layer : 0;
+      pensSeen.add(pen);
+      paths.push({
+        points,
+        color: artwork ? colorFor(palette, m) : pen === 0 ? palette.marks[Math.floor(palette.marks.length / 2)] ?? "#222222" : palette.accent,
+        opacity: artwork ? Math.max(0.02, Math.min(1, m.alpha)) : 1,
+        width: artwork ? Math.max(0.08, m.weight * 0.28 * (options.penWidth / 0.3)) : options.penWidth,
+        pen,
+        sourceAlpha: m.alpha,
+        length
+      });
       totalPoints += points.length;
       totalLengthPx += length;
     };
     for (const m of marks) {
-      const pen = options.separatePens ? m.layer : 0;
-      if (m.fill && m.closed && m.points.length >= 3) {
+      if (m.alpha < minAlpha) {
+        dropped += 1;
+        continue;
+      }
+      if (m.fill && m.closed && m.points.length >= 3 && !artwork) {
         const spacing = Math.max(minLengthPx * 3, options.penWidth * 2.2 / scale);
         for (const line of hatchPolygon(m.points, Math.PI / 4, spacing)) {
-          for (const piece of clipPolyline(line, sourceWidth, sourceHeight)) {
-            addPath(pen, piece);
-          }
+          for (const piece of clipPolyline(line, sourceWidth, sourceHeight)) add(piece, m);
         }
-        const outline = m.closed ? [...m.points, m.points[0]] : m.points;
+        const outline = [...m.points, m.points[0]];
         for (const piece of clipPolyline(outline, sourceWidth, sourceHeight)) {
-          addPath(pen, simplify(piece, options.tolerance));
+          add(simplify(piece, options.tolerance), m);
         }
         continue;
       }
       const raw = m.closed && m.points.length > 2 ? [...m.points, m.points[0]] : m.points;
       for (const piece of clipPolyline(raw, sourceWidth, sourceHeight)) {
-        addPath(pen, simplify(piece, options.tolerance));
+        add(simplify(piece, options.tolerance), m);
+      }
+    }
+    if (!artwork && options.maxLength && options.maxLength > 0) {
+      const budgetPx = options.maxLength * 1e3 / scale;
+      if (totalLengthPx > budgetPx) {
+        const order = paths.map((p, index) => ({ index, alpha: p.sourceAlpha })).sort((a, b) => a.alpha - b.alpha);
+        const doomed = /* @__PURE__ */ new Set();
+        let remaining = totalLengthPx;
+        for (const entry of order) {
+          if (remaining <= budgetPx) break;
+          doomed.add(entry.index);
+          remaining -= paths[entry.index].length;
+        }
+        if (doomed.size > 0) {
+          const kept = paths.filter((_, index) => !doomed.has(index));
+          dropped += doomed.size;
+          totalLengthPx = remaining;
+          totalPoints = kept.reduce((n, p) => n + p.points.length, 0);
+          paths.length = 0;
+          paths.push(...kept);
+          pensSeen.clear();
+          for (const p of kept) pensSeen.add(p.pen);
+        }
       }
     }
     const format = (n) => {
       const rounded = Math.round(n * 100) / 100;
       return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
     };
+    const px = (x) => format(offsetX + x * scale);
+    const py = (y) => format(offsetY + y * scale);
     const body = [];
-    const pens = [...byPen.keys()].sort((a, b) => a - b);
-    for (const pen of pens) {
-      const paths = byPen.get(pen);
-      const color = pen === 0 ? palette.marks[Math.floor(palette.marks.length / 2)] ?? "#222222" : palette.accent;
+    const defs = [];
+    let glowCount = 0;
+    if (artwork) {
       body.push(
-        `  <g inkscape:groupmode="layer" inkscape:label="Pen ${pen + 1}" id="pen-${pen + 1}" fill="none" stroke="${escapeXml(color)}" stroke-width="${options.penWidth}" stroke-linecap="round" stroke-linejoin="round">`
+        `  <g inkscape:groupmode="layer" inkscape:label="Ground" id="ground">`,
+        `    <rect x="0" y="0" width="${format(pageWidth)}" height="${format(pageHeight)}" fill="${escapeXml(palette.ground)}"/>`,
+        "  </g>"
       );
-      for (const points of paths) {
-        const d = points.map(([x, y], index) => {
-          const px = format(offsetX + x * scale);
-          const py = format(offsetY + y * scale);
-          return `${index === 0 ? "M" : "L"}${px} ${py}`;
-        }).join(" ");
-        body.push(`    <path d="${d}"/>`);
+      const glows = scene?.glows ?? [];
+      if (glows.length > 0) {
+        body.push(
+          `  <g inkscape:groupmode="layer" inkscape:label="Glow (screen only)" id="glow" style="mix-blend-mode:${palette.nocturne ? "screen" : "normal"}">`
+        );
+        glows.forEach((glow, index) => {
+          const id = `glow-${index}`;
+          const color = glow.accent ? palette.accent : palette.marks[Math.min(palette.marks.length - 1, Math.floor(glow.tone * palette.marks.length))];
+          defs.push(
+            `    <radialGradient id="${id}"><stop offset="0" stop-color="${escapeXml(color)}" stop-opacity="${format(Math.min(1, glow.strength))}"/><stop offset="1" stop-color="${escapeXml(color)}" stop-opacity="0"/></radialGradient>`
+          );
+          body.push(
+            `    <circle cx="${px(glow.x)}" cy="${py(glow.y)}" r="${format(glow.radius * scale)}" fill="url(#${id})"/>`
+          );
+          glowCount += 1;
+        });
+        body.push("  </g>");
+      }
+    }
+    const pens = [...pensSeen].sort((a, b) => a - b);
+    for (const pen of pens) {
+      const inLayer = paths.filter((p) => p.pen === pen);
+      if (inLayer.length === 0) continue;
+      body.push(
+        `  <g inkscape:groupmode="layer" inkscape:label="Pen ${pen + 1}" id="pen-${pen + 1}" fill="none" stroke-linecap="round" stroke-linejoin="round">`
+      );
+      for (const path of inLayer) {
+        const d = path.points.map(([x, y], index) => `${index === 0 ? "M" : "L"}${px(x)} ${py(y)}`).join(" ");
+        const opacity = path.opacity < 0.999 ? ` stroke-opacity="${format(path.opacity)}"` : "";
+        body.push(
+          `    <path d="${d}" stroke="${escapeXml(path.color)}" stroke-width="${format(path.width)}"${opacity}/>`
+        );
       }
       body.push("  </g>");
     }
     const drawLengthMm = totalLengthPx * scale;
-    const estimatedMinutes = (drawLengthMm / 45 + byPen.size * 0.5 + totalPoints * 4e-4) / 60 + drawLengthMm / 45 * 0.35 / 60;
+    const estimatedMinutes = drawLengthMm / 45 * 1.35 / 60 + pens.length * 0.5 / 60;
     const svg = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${format(pageWidth)}mm" height="${format(pageHeight)}mm" viewBox="0 0 ${format(pageWidth)} ${format(pageHeight)}" version="1.1">`,
       `  <title>${escapeXml(title)}</title>`,
-      `  <desc>Generated by the Interpretive Art Machine. Units are millimetres; one SVG user unit is one millimetre.</desc>`,
+      `  <desc>Generated by the Interpretive Art Machine (${options.mode} export). Units are millimetres; one SVG user unit is one millimetre.</desc>`,
+      ...defs.length > 0 ? ["  <defs>", ...defs, "  </defs>"] : [],
       ...body,
       "</svg>",
       ""
@@ -5306,12 +5379,13 @@ button:disabled {
     return {
       svg,
       stats: {
-        paths: totalPoints > 0 ? [...byPen.values()].reduce((n, p) => n + p.length, 0) : 0,
+        paths: paths.length,
         points: totalPoints,
         drawLength: drawLengthMm / 1e3,
         estimatedMinutes,
-        pens: byPen.size,
-        dropped
+        pens: pens.length,
+        dropped,
+        glows: glowCount
       }
     };
   }
@@ -5884,6 +5958,7 @@ button:disabled {
     const revariate = must("revariate");
     const download = must("download");
     const downloadSvg = must("download-svg");
+    const svgMode = must("svg-mode");
     const paperSelect = must("paper-select");
     const detailSelect = must("detail-select");
     const plotStats = must("plot-stats");
@@ -6316,24 +6391,31 @@ button:disabled {
     function currentPlotOptions() {
       return {
         ...DEFAULT_PLOT_OPTIONS,
+        mode: svgMode.value,
         paper: paperSelect.value,
-        tolerance: Number(detailSelect.value) || DEFAULT_PLOT_OPTIONS.tolerance
+        tolerance: Number(detailSelect.value) || DEFAULT_PLOT_OPTIONS.tolerance,
+        // Detail controls both point density and how many faint marks survive,
+        // so "coarse" produces a plot that finishes in a sane amount of time.
+        minAlpha: { "1.6": 0.16, "0.7": 0.08, "0.25": 0.035 }[detailSelect.value] ?? 0.08,
+        maxLength: { "1.6": 45, "0.7": 110, "0.25": 260 }[detailSelect.value] ?? 110
       };
     }
     function buildPlot() {
       if (!lastRender) return null;
       const format = FORMATS[formatSelect.value] ?? FORMATS.portrait;
+      const options = currentPlotOptions();
       const { svg, stats } = toPlotterSvg(
         lastRender.marks,
         format.width,
         format.height,
         lastRender.palette,
-        currentPlotOptions(),
-        `${subject?.title ?? "Untitled"} \u2014 ${lastRender.style.name}`
+        options,
+        `${subject?.title ?? "Untitled"} \u2014 ${lastRender.style.name}`,
+        lastRender.scene
       );
       const minutes = stats.estimatedMinutes;
       const time = minutes < 1 ? "under a minute" : minutes < 90 ? `~${Math.round(minutes)} min` : `~${(minutes / 60).toFixed(1)} hr`;
-      const summary = `${stats.paths.toLocaleString()} paths \xB7 ${stats.pens} pen${stats.pens === 1 ? "" : "s"} \xB7 ${stats.drawLength.toFixed(1)} m of line \xB7 ${time} to plot` + (stats.dropped > 0 ? ` \xB7 ${stats.dropped.toLocaleString()} specks dropped` : "");
+      const summary = options.mode === "artwork" ? `${stats.paths.toLocaleString()} paths` + (stats.glows > 0 ? ` \xB7 ${stats.glows} gradient glows` : "") + ` \xB7 ground + ${stats.pens} pen layer${stats.pens === 1 ? "" : "s"}` + (stats.dropped > 0 ? ` \xB7 ${stats.dropped.toLocaleString()} invisible marks dropped` : "") : `${stats.paths.toLocaleString()} paths \xB7 ${stats.pens} pen${stats.pens === 1 ? "" : "s"} \xB7 ${stats.drawLength.toFixed(1)} m of line \xB7 ${time} to plot` + (stats.dropped > 0 ? ` \xB7 ${stats.dropped.toLocaleString()} dropped` : "");
       return { svg, summary };
     }
     function describePlot() {
@@ -6342,10 +6424,12 @@ button:disabled {
         plotStats.textContent = "";
         return;
       }
-      const warning = lastRender && !lastRender.treatment.plottable ? " \u2014 this style is screen-only, so the plot will be its line skeleton without the glow or screening" : "";
-      plotStats.textContent = `Plot: ${plot.summary}${warning}`;
+      const mode = svgMode.value;
+      const note = mode === "artwork" ? "Artwork SVG: keeps ground, colour, opacity and glows \u2014 matches the screen. Delete the Ground and Glow layers before plotting." : lastRender && !lastRender.treatment.plottable ? "Plot SVG: strokes only. This style is screen-only, so you get its line skeleton without the glow." : "Plot SVG: strokes only, fills hatched, one colour per pen layer.";
+      plotStats.textContent = `${plot.summary}
+${note}`;
     }
-    for (const control of [paperSelect, detailSelect]) {
+    for (const control of [svgMode, paperSelect, detailSelect]) {
       control.addEventListener("change", describePlot);
     }
     downloadSvg.addEventListener("click", () => {
@@ -6356,7 +6440,7 @@ button:disabled {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${name}-${lastRender?.style.key ?? "plot"}.svg`;
+      link.download = `${name}-${lastRender?.style.key ?? "art"}-${svgMode.value}.svg`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1e3);
     });

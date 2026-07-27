@@ -11,7 +11,7 @@ import { analyze, type SongAnalysis } from '../analysis/analyze';
 import { explain, interpret, type ArtGenome } from '../analysis/interpret';
 import { acquire, type LyricsResult, type TrackGuess, type VideoMeta } from '../lyrics';
 import { render, type RenderHandle, type RenderResult } from '../art/renderer';
-import { DEFAULT_PLOT_OPTIONS, toPlotterSvg, type PaperKey } from '../art/svg';
+import { DEFAULT_PLOT_OPTIONS, toPlotterSvg, type PaperKey, type SvgMode } from '../art/svg';
 import { STYLES } from '../art/catalog';
 import { ENGINE_BY_KEY } from '../art/engines';
 import { TREATMENT_BY_KEY } from '../art/treatments';
@@ -115,6 +115,7 @@ export function mountApp(): void {
   const revariate = must<HTMLButtonElement>('revariate');
   const download = must<HTMLButtonElement>('download');
   const downloadSvg = must<HTMLButtonElement>('download-svg');
+  const svgMode = must<HTMLSelectElement>('svg-mode');
   const paperSelect = must<HTMLSelectElement>('paper-select');
   const detailSelect = must<HTMLSelectElement>('detail-select');
   const plotStats = must<HTMLElement>('plot-stats');
@@ -665,21 +666,32 @@ export function mountApp(): void {
   function currentPlotOptions() {
     return {
       ...DEFAULT_PLOT_OPTIONS,
+      mode: svgMode.value as SvgMode,
       paper: paperSelect.value as PaperKey,
       tolerance: Number(detailSelect.value) || DEFAULT_PLOT_OPTIONS.tolerance,
+      // Detail controls both point density and how many faint marks survive,
+      // so "coarse" produces a plot that finishes in a sane amount of time.
+      minAlpha: ({ '1.6': 0.16, '0.7': 0.08, '0.25': 0.035 } as Record<string, number>)[
+        detailSelect.value
+      ] ?? 0.08,
+      maxLength: ({ '1.6': 45, '0.7': 110, '0.25': 260 } as Record<string, number>)[
+        detailSelect.value
+      ] ?? 110,
     };
   }
 
   function buildPlot(): { svg: string; summary: string } | null {
     if (!lastRender) return null;
     const format = FORMATS[(formatSelect.value as FormatKey)] ?? FORMATS.portrait;
+    const options = currentPlotOptions();
     const { svg, stats } = toPlotterSvg(
       lastRender.marks,
       format.width,
       format.height,
       lastRender.palette,
-      currentPlotOptions(),
+      options,
       `${subject?.title ?? 'Untitled'} — ${lastRender.style.name}`,
+      lastRender.scene,
     );
 
     const minutes = stats.estimatedMinutes;
@@ -689,28 +701,35 @@ export function mountApp(): void {
         ? `~${Math.round(minutes)} min`
         : `~${(minutes / 60).toFixed(1)} hr`;
 
-    const summary =
-      `${stats.paths.toLocaleString()} paths · ${stats.pens} pen${stats.pens === 1 ? '' : 's'} · ` +
-      `${stats.drawLength.toFixed(1)} m of line · ${time} to plot` +
-      (stats.dropped > 0 ? ` · ${stats.dropped.toLocaleString()} specks dropped` : '');
+    const summary = options.mode === 'artwork'
+      ? `${stats.paths.toLocaleString()} paths` +
+        (stats.glows > 0 ? ` · ${stats.glows} gradient glows` : '') +
+        ` · ground + ${stats.pens} pen layer${stats.pens === 1 ? '' : 's'}` +
+        (stats.dropped > 0 ? ` · ${stats.dropped.toLocaleString()} invisible marks dropped` : '')
+      : `${stats.paths.toLocaleString()} paths · ${stats.pens} pen${stats.pens === 1 ? '' : 's'} · ` +
+        `${stats.drawLength.toFixed(1)} m of line · ${time} to plot` +
+        (stats.dropped > 0 ? ` · ${stats.dropped.toLocaleString()} dropped` : '');
 
     return { svg, summary };
   }
 
-  /** Shows what a plot would cost without making the user export to find out. */
+  /** Shows what the export contains without making the user download it first. */
   function describePlot(): void {
     const plot = buildPlot();
     if (!plot) {
       plotStats.textContent = '';
       return;
     }
-    const warning = lastRender && !lastRender.treatment.plottable
-      ? ' — this style is screen-only, so the plot will be its line skeleton without the glow or screening'
-      : '';
-    plotStats.textContent = `Plot: ${plot.summary}${warning}`;
+    const mode = svgMode.value as SvgMode;
+    const note = mode === 'artwork'
+      ? 'Artwork SVG: keeps ground, colour, opacity and glows — matches the screen. Delete the Ground and Glow layers before plotting.'
+      : lastRender && !lastRender.treatment.plottable
+        ? 'Plot SVG: strokes only. This style is screen-only, so you get its line skeleton without the glow.'
+        : 'Plot SVG: strokes only, fills hatched, one colour per pen layer.';
+    plotStats.textContent = `${plot.summary}\n${note}`;
   }
 
-  for (const control of [paperSelect, detailSelect]) {
+  for (const control of [svgMode, paperSelect, detailSelect]) {
     control.addEventListener('change', describePlot);
   }
 
@@ -727,7 +746,7 @@ export function mountApp(): void {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${name}-${lastRender?.style.key ?? 'plot'}.svg`;
+    link.download = `${name}-${lastRender?.style.key ?? 'art'}-${svgMode.value}.svg`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });

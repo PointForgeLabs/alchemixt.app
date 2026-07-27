@@ -201,26 +201,37 @@ Rendering runs in four stages, all spread across animation frames in 12 ms
 slices so the canvas visibly fills: build geometry, apply the treatment, paint,
 finish.
 
-### 6. Plotting (`src/art/svg.ts`)
+### 6. Export (`src/art/svg.ts`)
 
-**Download SVG** exports the same marks the painter drew, in millimetres, ready
-for Inkscape and a pen plotter. Four things a pen cannot do are handled at
-export rather than left to you:
+There are two genuinely different jobs here, and one file served neither well,
+so **Download SVG** has a mode:
 
-- **It cannot fill.** Any region still marked filled becomes hatching.
+- **Artwork** — a faithful vector copy of what is on screen, for opening in
+  Inkscape and taking apart by hand. Keeps the ground, per-mark colour, mark
+  opacity, and renders glows as SVG radial gradients in their own layer. Delete
+  the Ground and Glow layers before plotting.
+- **Plot** — what a pen can honestly draw. No ground, no glows, no opacity,
+  fills converted to hatching, one colour per pen layer.
+
+Both are in millimetres, clipped to the page, simplified, and grouped into
+named Inkscape layers.
+
+Three things a pen cannot do are handled at export rather than left to you:
+
+- **It cannot fill.** Regions become hatching in plot mode.
 - **It cannot draw off the paper.** Marks bleed past the canvas edge by design, so every path is Cohen–Sutherland clipped to the page first.
-- **It cannot draw a million points.** Paths are simplified (Ramer–Douglas–Peucker, three detail levels) and specks under 0.4 mm are dropped.
-- **It has one colour at a time.** Marks are grouped into named Inkscape layers, one per pen, each individually plottable.
+- **It has no opacity.** A mark at 5% alpha is a glow on screen and a full-strength scribble on paper. Plot mode drops marks below a visibility threshold, and enforces a **total line-length budget** — some compositions are hundreds of full-width strokes, none of them faint, which opacity culling alone cannot bound. Over budget, the faintest marks go first, which thins the picture the way squinting at it would.
 
-Paper is A5/A4/A3/Letter/200 mm square, auto-oriented to the artwork and scaled
-uniformly inside a 12 mm margin — never distorted to fill the sheet. Before you
-export, the interface tells you what the plot will cost: path count, pen count,
-total metres of line, and a rough plotting time.
+The **Detail** control sets all three: point density, the faintness threshold,
+and the length budget. Coarse turns a two-hour plot into a twenty-minute one.
 
-Screen-only styles still export; you get their line skeleton without the glow
-or screening, and the interface says so. Note that a Blueprint plot inverts —
-bright lines on dark ground become dark lines on white paper, because the paper
-is the paper.
+Paper is A5/A4/A3/Letter/200 mm square, auto-oriented and scaled uniformly
+inside a 12 mm margin — never distorted to fill the sheet. Before exporting,
+the interface reports what the file contains and, in plot mode, roughly how
+long it will take to draw.
+
+Note that a Blueprint plot inverts: bright lines on a dark ground become dark
+lines on white paper, because the paper is the paper.
 
 All randomness comes from a seeded `mulberry32` PRNG — `Math.random` appears
 nowhere in the art pipeline. **The same lyrics always produce the same artwork**,
