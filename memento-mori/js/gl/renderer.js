@@ -494,6 +494,24 @@ export class SkullRenderer {
 
     if (!chosen) {
       if (this.gl.isContextLost()) { this.contextLost = true; throw contextLostError(); }
+      // Last resort: if the drawing buffer has been disturbed, put it back and
+      // try once more. A resized canvas can leave ANGLE unable to complete any
+      // framebuffer at all, which is indistinguishable from an unsupported
+      // format until you notice that sizes which worked before now do not.
+      if (this.canvas.width !== 8 || this.canvas.height !== 8) {
+        this.canvas.width = 8;
+        this.canvas.height = 8;
+        while (this.gl.getError() !== this.gl.NO_ERROR) { /* drain */ }
+        for (const h of heights) {
+          for (const w of widths) {
+            if (this._allocateAny(w, h, null) >= 0) { chosen = { w, h }; break; }
+          }
+          if (chosen) break;
+        }
+      }
+    }
+
+    if (!chosen) {
       // Re-run the startup probe now. If 64x64 has stopped working too then the
       // context or driver state is the problem, not the size; if it still works,
       // the refusal really is size-dependent. Those need different fixes, and
@@ -521,8 +539,15 @@ export class SkullRenderer {
     this.lastGoodTile = { w: tileW, h: tileH };
     this.tilePlan = { key, tileW, tileH, tiled: tileW < width || tileH < band };
 
-    this.canvas.width = Math.max(this.canvas.width, this.tilePlan.tileW);
-    this.canvas.height = Math.max(this.canvas.height, this.tilePlan.tileH);
+    // The canvas is deliberately never resized. Nothing is ever drawn to the
+    // default framebuffer -- every pass renders to an FBO and is read back -- so
+    // its size is irrelevant, and the viewport is governed by the attachment, not
+    // by the drawing buffer. Growing it to match the tile (which this used to do,
+    // for no reason at all) makes ANGLE reallocate the D3D11 swap chain, and on
+    // Intel Iris Xe that leaves the context unable to complete *any* subsequent
+    // framebuffer while still reporting isContextLost() === false. The symptom is
+    // FRAMEBUFFER_UNSUPPORTED at every size and format, including sizes that
+    // worked moments earlier.
     return this.tilePlan;
   }
 

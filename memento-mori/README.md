@@ -111,6 +111,7 @@ node dev/targets.mjs                   # all 18 render-target configurations
 node dev/tiling.mjs                    # tiled vs untiled, byte for byte
 node dev/contextloss.mjs               # driver-reset diagnosis and recovery
 node dev/regression.mjs                # allocations that stop working mid-render
+node dev/canvasstate.mjs               # drawing buffer untouched, context stays healthy
 node dev/checks.mjs                    # 19 awkward parameter combinations
 node dev/bundle.mjs out.html           # single-file build for file://
 ```
@@ -155,6 +156,22 @@ dev/                  headless render harnesses
 WebGL2 with `EXT_color_buffer_float` (or `EXT_color_buffer_half_float`). That
 covers current desktop and mobile browsers; the app reports a clear error rather
 than degrading if it is missing.
+
+### The canvas is never resized
+
+The renderer draws only to framebuffer objects and reads them back with
+`readPixels`; nothing is ever drawn to the default framebuffer, so the canvas
+exists purely to own the GL context and its size is irrelevant. It stays 8×8.
+
+This is load-bearing. Resizing a WebGL canvas makes ANGLE reallocate the D3D11
+swap chain, and on Intel Iris Xe that leaves the context unable to complete *any*
+framebuffer afterwards — while `isContextLost()` still reports `false`. The
+symptom is `FRAMEBUFFER_UNSUPPORTED` at every size and every pixel format,
+including sizes that allocated successfully seconds earlier, which reads exactly
+like an unsupported-format problem and is not one.
+
+`dev/canvasstate.mjs` asserts the drawing buffer stays 8×8 across renders at
+several raster sizes, and that a 64×64 allocation still succeeds afterwards.
 
 ### Driver watchdogs
 

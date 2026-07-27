@@ -306,6 +306,7 @@ async function boot() {
     targetConfig: () => (current && current.drawing.fields.targetConfig)
       || (renderer.config ? renderer.config.id : 'none'),
     glContext: () => renderer.gl,
+    reprobe: () => renderer._probeMatrix(64, 64),
     probeTargets: (w, h) => renderer._prepare(w, h * 4, h),
     tileBudget: () => renderer.tileBudget,
     gpu: () => ({ ...renderer.debugInfo, probeResult: renderer.probe, configs: renderer.configs.map((c) => c.short) }),
