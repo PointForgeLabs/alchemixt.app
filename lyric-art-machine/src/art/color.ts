@@ -98,6 +98,10 @@ export interface PaletteInput {
   /** Treatment ground override, e.g. blueprint's deep blue. */
   lightnessShift?: number;
   saturationShift?: number;
+  /** Audio-driven saturation offset — distortion pushes colour acidic. */
+  saturationBoost?: number;
+  /** 0..1 — how far apart the mark lightnesses sit, from the music's dynamics. */
+  spread?: number;
   rng: Rng;
 }
 
@@ -115,7 +119,8 @@ export function buildPalette(input: PaletteInput): Palette {
   // lyrics felt like.
   const nocturne = lightnessShift < -20 ? true : input.forceNocturne ?? valence < 0.08;
 
-  const saturation = 28 + arousal * 46 + Math.abs(valence) * 12 + (input.saturationShift ?? 0);
+  const saturation = 28 + arousal * 46 + Math.abs(valence) * 12
+    + (input.saturationShift ?? 0) + (input.saturationBoost ?? 0);
   const offsets = HARMONY_OFFSETS[harmony];
 
   const groundLightness = (nocturne
@@ -133,9 +138,12 @@ export function buildPalette(input: PaletteInput): Palette {
   const marks = offsets.map((offset, i) => {
     const drift = rng.range(-9, 9);
     const step = i / Math.max(1, offsets.length - 1);
+    // Dynamic range decides how far the palette's values travel: a squashed
+    // master gives flat, similar tones; a wide one gives real contrast.
+    const range = 14 + (input.spread ?? 0.5) * 32;
     const lightness = nocturne
-      ? 42 + step * 30 + arousal * 12 + lift
-      : 46 - step * 26 - arousal * 8 - lift * 0.6;
+      ? 42 + step * range + arousal * 12 + lift
+      : 46 - step * (range * 0.85) - arousal * 8 - lift * 0.6;
     return hsl(
       baseHue + offset + drift,
       saturation * (0.72 + step * 0.35),

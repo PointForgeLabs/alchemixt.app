@@ -48,6 +48,12 @@ export interface ArtGenome {
   brightness: number;
   /** Structural sections detected in the audio; 1 when unheard. */
   sections: number;
+  /** Added to palette saturation. Distortion pushes colour acidic. */
+  saturationBoost: number;
+  /** 0..1 — lightness range across the palette's marks, from dynamics. */
+  spread: number;
+  /** Where the hue came from, for the written reading. */
+  hueSource: 'named' | 'key' | 'theme';
   /** Loudness envelope across the track, used to shape the composition. */
   arc: number[];
 }
@@ -130,6 +136,12 @@ function circularMean(hues: number[]): number {
   return (((Math.atan2(y, x) * 180) / Math.PI) + 360) % 360;
 }
 
+/** Blends two hue angles the short way round, weighted t = 0..1 toward b. */
+function circularBlend(a: number, b: number, t: number): number {
+  const delta = (((b - a) % 360) + 540) % 360 - 180;
+  return ((a + delta * t) % 360 + 360) % 360;
+}
+
 /**
  * Musical key to hue, laid out around the circle of fifths rather than the
  * chromatic scale — neighbouring keys sound related, so they should look related.
@@ -153,13 +165,20 @@ function stillness(audio: AudioFeatures): number {
 }
 
 function pickHarmony(a: SongAnalysis, dominant: ThemeKey, audio: AudioFeatures | null): Harmony {
+  // With audio, the palette's *structure* follows the music: how far apart the
+  // colours sit is a question about tempo and texture, not subject matter.
+  if (audio) {
+    if (audio.roughness > 0.6 && audio.energy > 0.5) return 'complementary';
+    if (audio.tempo >= 138) return 'complementary';
+    if (audio.tempo >= 112) return a.diversity > 0.6 ? 'triad' : 'split';
+    if (audio.tempo >= 88) return 'analogous';
+    if (audio.mode === 'minor' && audio.brightness < 0.45) return 'monochrome';
+    return 'analogous';
+  }
+
   // Conflicted songs get conflicted palettes.
   const contested = a.themes.length > 1 && (a.themes[1]?.strength ?? 0) > 0.72;
   if (contested) return a.arousal > 0.6 ? 'complementary' : 'split';
-  if (audio && audio.roughness > 0.62 && audio.energy > 0.55) return 'complementary';
-  if (audio && audio.mode === 'minor' && audio.keyConfidence > 0.35 && audio.brightness < 0.4) {
-    return 'monochrome';
-  }
   if (dominant === 'defiance' || dominant === 'fire') return 'complementary';
   if (dominant === 'night' || dominant === 'loss') return 'monochrome';
   if (a.diversity > 0.72) return 'triad';
@@ -243,13 +262,23 @@ export function interpret(
   // ---- palette anchor ----
   const themeHue = HUE_BY_THEME[dominantKey];
   let baseHue: number;
+  let hueSource: ArtGenome['hueSource'];
+
   if (analysis.namedHues.length > 0) {
     // Colors the lyrics state outright still win over everything.
     baseHue = circularMean(analysis.namedHues.slice(0, 3));
-  } else if (audio && audio.keyConfidence > 0.28) {
-    baseHue = circularMean([themeHue, themeHue, hueFromKey(audio.keyIndex, audio.mode)]);
+    hueSource = 'named';
+  } else if (audio && audio.keyConfidence > 0.16) {
+    // The key leads in proportion to how sure the machine is of it. Weighting
+    // the theme two-to-one against the key, as this used to, meant the music
+    // could never move the colour more than a third of the way — every song
+    // about the same subject came back the same hue.
+    const lead = clamp(0.35 + audio.keyConfidence * 0.65, 0, 1);
+    baseHue = circularBlend(themeHue, hueFromKey(audio.keyIndex, audio.mode), lead);
+    hueSource = 'key';
   } else {
     baseHue = themeHue;
+    hueSource = 'theme';
   }
 
   const seedBase = audio ? (analysis.fingerprint ^ audioSeed(audio)) >>> 0 : analysis.fingerprint;
@@ -308,6 +337,15 @@ export function interpret(
     pulse: audio && audio.tempo > 0 ? clamp((audio.tempo - 60) / 130, 0, 1) : 0.5,
     brightness: audio ? audio.brightness : 0.5,
     sections: audio ? audio.sections : 1,
+
+    // Noisy, distorted music gets acidic colour; clean music stays calmer.
+    // Minor keys sit a little more muted than major ones.
+    saturationBoost: audio
+      ? clamp(audio.roughness * 26 - 8 + (audio.mode === 'major' ? 5 : -5) * audio.keyConfidence, -14, 24)
+      : 0,
+    // Wide dynamics mean a wide range of values; a squashed master flattens it.
+    spread: audio ? clamp(0.25 + audio.dynamicRange * 0.75, 0, 1) : 0.5,
+    hueSource,
     arc: audio ? audio.arc : [],
   };
 }
@@ -411,6 +449,18 @@ export function explain(
           (audio.pulseClarity > 0.55
             ? 'and a strongly metrical one, so the composition is more regular and symmetrical.'
             : 'but a loose one, so the composition is left freer and less aligned.'),
+      );
+    }
+
+    if (genome.hueSource === 'key') {
+      heardNotes.push(
+        `Palette is anchored to the music: ${audio.keyName} places it at ${Math.round(genome.baseHue)}° ` +
+          `on the circle of fifths, ${audio.tempo >= 138 ? 'the tempo opens it into complementary opposites' : audio.tempo >= 112 ? 'the tempo spreads it across the wheel' : 'the tempo keeps it to neighbouring hues'}` +
+          `, and ${audio.roughness > 0.55 ? 'the distortion pushes it acidic' : 'the clean texture keeps it calm'}.`,
+      );
+    } else if (genome.hueSource === 'named') {
+      heardNotes.push(
+        'The lyrics name colours outright, so those override the key — the words win that argument.',
       );
     }
 

@@ -178,7 +178,10 @@ to green.
 **When audio is present, the division of labour is deliberate: the lyrics decide
 what the song is *about*, and the audio decides how it *moves*.**
 
-- Musical **key** sets hue around the circle of fifths, so related keys look related
+- Musical **key** sets hue around the circle of fifths, so related keys look related. The key *leads* in proportion to how confident the estimate is — weighting the lyric theme against it, as an earlier version did, meant music could never move colour more than a third of the way, and every song on a subject came back the same hue
+- **Tempo** picks the harmony scheme: fast opens the palette into complementary opposites, mid-tempo spreads it across the wheel, slow keeps it to neighbouring hues
+- **Roughness** drives saturation — distortion pushes colour acidic, clean textures stay calm
+- **Dynamic range** sets how far apart the palette's values sit; a squashed master gives flat tone, a wide one real contrast
 - **Mode** moves emotional valence — major lifts, minor darkens — scaled by key confidence
 - **Energy, tempo, and onset density** largely replace the lyric energy estimate, because audio is simply better evidence for how hard a song hits
 - **Pulse clarity** becomes compositional symmetry; a metronomic track is a symmetrical one
@@ -229,6 +232,11 @@ Paper is A5/A4/A3/Letter/200 mm square, auto-oriented and scaled uniformly
 inside a 12 mm margin — never distorted to fill the sheet. Before exporting,
 the interface reports what the file contains and, in plot mode, roughly how
 long it will take to draw.
+
+**Each palette colour becomes its own pen layer**, labelled with its hex, so a
+multi-pen plotter (or a manual pen swap) can reproduce the picture's colour.
+Grouping by an internal layer index instead used to collapse five colours into
+two.
 
 **All colours are written as hex.** Canvas is happy with CSS Color Level 4's
 space-separated `hsl(H S% L%)`, but Inkscape's parser is not — it fails

@@ -95,6 +95,8 @@ export function render(
     arousal: biased.arousal,
     forceNocturne: biased.forceNocturne,
     brightness: biased.brightness,
+    saturationBoost: biased.saturationBoost,
+    spread: biased.spread,
     lightnessShift: treatment.groundShift?.lightness,
     saturationShift: treatment.groundShift?.saturation,
     rng,

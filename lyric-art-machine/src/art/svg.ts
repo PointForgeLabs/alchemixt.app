@@ -240,6 +240,16 @@ export function toPlotterSvg(
   // paper. Plotting is stricter, because a pen has no opacity at all.
   const minAlpha = artwork ? 0.02 : (options.minAlpha ?? 0.08);
 
+  // Stable pen numbering, assigned in first-seen order.
+  const penByColor = new Map<string, number>();
+  const penIndexFor = (hex: string): number => {
+    const existing = penByColor.get(hex);
+    if (existing !== undefined) return existing;
+    const next = penByColor.size;
+    penByColor.set(hex, next);
+    return next;
+  };
+
   const paths: EmittedPath[] = [];
   let dropped = 0;
   let totalPoints = 0;
@@ -254,15 +264,14 @@ export function toPlotterSvg(
       dropped += 1;
       return;
     }
-    const pen = options.separatePens ? m.layer : 0;
-    pensSeen.add(pen);
-
-    const source = artwork
-      ? colorFor(palette, m)
-      : pen === 0
-        ? (palette.marks[Math.floor(palette.marks.length / 2)] ?? '#222222')
-        : palette.accent;
+    // Colour first, pen second. Grouping pens by the mark's internal layer
+    // index threw away most of the palette: five colours collapsed into two.
+    // One pen per distinct colour keeps the picture's colour in the file, and
+    // is what a multi-pen plotter (or a manual pen swap) actually needs.
+    const source = colorFor(palette, m);
     const { hex, alpha } = hslToHex(source);
+    const pen = options.separatePens ? penIndexFor(hex) : 0;
+    pensSeen.add(pen);
 
     paths.push({
       points,
@@ -398,9 +407,10 @@ export function toPlotterSvg(
     const inLayer = paths.filter((p) => p.pen === pen);
     if (inLayer.length === 0) continue;
 
+    const penColor = (inLayer[0] as EmittedPath).color;
     body.push(
-      `  <g inkscape:groupmode="layer" inkscape:label="Pen ${pen + 1}" id="pen-${pen + 1}" ` +
-        'stroke-linecap="round" stroke-linejoin="round">',
+      `  <g inkscape:groupmode="layer" inkscape:label="Pen ${pen + 1} ${penColor}" ` +
+        `id="pen-${pen + 1}" stroke-linecap="round" stroke-linejoin="round">`,
     );
     for (const path of inLayer) {
       const d = path.points
